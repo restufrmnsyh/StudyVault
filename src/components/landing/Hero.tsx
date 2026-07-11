@@ -30,7 +30,7 @@ const pulseGlow = {
 
 export function Hero() {
   return (
-    <section className="relative flex min-h-[100dvh] items-center overflow-hidden">
+    <section className="relative flex min-h-[90dvh] items-center overflow-hidden">
       {/* Layered background effects */}
       <div className="pointer-events-none absolute inset-0">
         {/* Primary radial gradient — violet center bloom */}
