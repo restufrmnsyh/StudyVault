@@ -35,11 +35,10 @@ export function Navbar() {
     >
       {/* Navbar glass pane */}
       <div
-        className={`transition-all duration-500 ease-out ${
-          isScrolled
-            ? "border-b border-white/[0.06] bg-background/60 shadow-[0_1px_8px_rgba(0,0,0,0.15)] backdrop-blur-2xl backdrop-saturate-150"
-            : "bg-transparent"
-        }`}
+        className={`transition-all duration-500 ease-out ${isScrolled
+          ? "border-b border-white/[0.06] bg-background/60 shadow-[0_1px_8px_rgba(0,0,0,0.15)] backdrop-blur-2xl backdrop-saturate-150"
+          : "bg-transparent"
+          }`}
       >
         <Container>
           <nav className="flex h-14 items-center justify-between">
