@@ -1,75 +1,201 @@
-# React + TypeScript + Vite
+# 📚 StudyVault
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **Your Academic Knowledge, Finally Organized.**
 
-Currently, two official plugins are available:
+StudyVault is a modern Academic Knowledge Hub designed to help university students organize lecture materials, notes, assignments, and learning progress in one place.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🚀 Current Status
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Version:** `v0.3.2`
 
-## Expanding the ESLint configuration
+**Status:** 🚧 Active Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Current Sprint:** Dashboard Polish (Sprint 3.2B)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## ✨ Features
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### ✅ Completed
 
+- Premium Landing Page
+- Responsive Dashboard Layout
+- Dashboard Overview
+- Continue Learning Section
+- Recent Notes
+- Dark Mode UI
+- Responsive Design
+
+### 🚧 In Progress
+
+- Dashboard Polish
+- Courses Module
+- Notes Module
+- Planner Module
+
+### 🔮 Planned
+
+- Authentication
+- Material Upload
+- Search
+- AI Study Assistant
+- AI Note Summary
+- AI Quiz Generator
+
+---
+
+## 🛠 Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Frontend | React 19 |
+| Build Tool | Vite 8 |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 |
+| Animation | Framer Motion |
+| Icons | Lucide React |
+
+---
+
+## 📷 Preview
+
+### Landing Page
+
+> Screenshots will be added after Sprint 3.
+
+### Dashboard
+
+> Screenshots will be added after Sprint 3.
+
+---
+
+## 📈 Development Journey
+
+- ✅ Sprint 1 — Project Foundation
+- ✅ Sprint 2 — Landing Page
+- ✅ Sprint 2.5 — Landing Page Polish
+- ✅ Sprint 3.1 — Dashboard Layout
+- ✅ Sprint 3.2A — Dashboard Overview
+- 🚧 Sprint 3.2B — Dashboard Polish
+- ⏳ Sprint 3.3 — Courses Module
+- ⏳ Sprint 3.4 — Notes Module
+- ⏳ Sprint 3.5 — Planner Module
+
+---
+
+## 🗺 Roadmap
+
+### v0.1
+- [x] Project Setup
+- [x] React + Vite
+- [x] Tailwind CSS v4
+
+### v0.2
+- [x] Landing Page
+- [x] Hero Section
+- [x] Features
+- [x] FAQ
+- [x] CTA
+- [x] Responsive Design
+
+### v0.3
+- [x] Dashboard Layout
+- [x] Sidebar
+- [x] Topbar
+- [x] Dashboard Overview
+- [ ] Dashboard Polish
+- [ ] Courses
+- [ ] Notes
+- [ ] Planner
+
+### v0.4
+- [ ] Authentication
+- [ ] User Session
+
+### v0.5
+- [ ] Backend Integration
+- [ ] Database
+- [ ] Material Upload
+
+### v1.0
+- [ ] Production Release
+
+---
+
+## 📁 Project Structure
+
+```text
+src/
+├── components/
+│   ├── common/
+│   ├── dashboard/
+│   ├── landing/
+│   ├── layout/
+│   └── ui/
+├── pages/
+├── data/
+├── types/
+├── hooks/
+├── lib/
+└── services/
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## ⚙️ Getting Started
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Clone the repository
 
+```bash
+git clone https://github.com/restufrmnsyh/StudyVault.git
 ```
+
+Go to the project folder
+
+```bash
+cd StudyVault
+```
+
+Install dependencies
+
+```bash
+npm install
+```
+
+Start development server
+
+```bash
+npm run dev
+```
+
+Build for production
+
+```bash
+npm run build
+```
+
+---
+
+## 🎯 Vision
+
+StudyVault aims to become a modern Academic Knowledge Hub where university students can store, organize, and revisit their learning materials efficiently through a clean, intuitive, and productive interface.
+
+---
+
+## 👨‍💻 Author
+
+**Muhammad Restu Firmansyah**
+
+Informatics Student  
+UPN "Veteran" Yogyakarta
+
+GitHub:
+https://github.com/restufrmnsyh
+
+---
+
+## 📌 License
+
+This project is currently under active development and intended for educational and portfolio purposes.
