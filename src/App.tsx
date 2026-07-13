@@ -3,6 +3,7 @@ import { LandingPage } from "@/pages/LandingPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CoursesPage } from "@/pages/CoursesPage";
 import { CourseDetailPage } from "@/pages/CourseDetailPage";
+import { NotesPage } from "@/pages/NotesPage";
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash);
@@ -28,6 +29,10 @@ export default function App() {
 
   if (hash.startsWith("#/dashboard/courses")) {
     return <CoursesPage />;
+  }
+
+  if (hash.startsWith("#/dashboard/notes")) {
+    return <NotesPage />;
   }
 
   // Any other hash starting with #/dashboard renders the dashboard overview

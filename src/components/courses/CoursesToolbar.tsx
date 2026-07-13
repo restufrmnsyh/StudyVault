@@ -1,4 +1,5 @@
-import { Search, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { SearchInput } from "@/components/common";
 import { semesters } from "@/data/courses";
 
 interface CoursesToolbarProps {
@@ -16,17 +17,12 @@ export function CoursesToolbar({
 }: CoursesToolbarProps) {
     return (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="group flex flex-1 items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[13px] text-text-muted ring-violet-500/15 transition-all duration-200 focus-within:border-violet-500/30 focus-within:bg-white/[0.04] focus-within:ring-4">
-                <Search className="h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200 group-focus-within:text-violet-400" />
-                <input
-                    type="text"
-                    value={searchValue}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Search courses or lecturers..."
-                    aria-label="Search courses"
-                    className="w-full bg-transparent text-text-secondary outline-none placeholder:text-text-muted"
-                />
-            </div>
+            <SearchInput
+                value={searchValue}
+                onChange={onSearchChange}
+                placeholder="Search courses or lecturers..."
+                ariaLabel="Search courses"
+            />
 
             <div className="relative">
                 <select
