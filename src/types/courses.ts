@@ -14,12 +14,13 @@ export interface Course {
     color: string;
 }
 
+export type MaterialType = "pdf" | "ppt" | "doc" | "xls" | "zip" | "image" | "video";
+
 export interface CourseMaterial {
     id: string;
-    title: string;
-    type: "pdf" | "video" | "slides";
-    /** File size ("2.4 MB") or duration ("18 min") depending on type */
-    meta: string;
+    name: string;
+    type: MaterialType;
+    size: string;
     updatedAt: string;
 }
 

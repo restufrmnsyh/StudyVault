@@ -18,7 +18,7 @@ export const courses: Course[] = [
         description:
             "Covers core data structures (trees, graphs, hash tables) and algorithm design techniques, with an emphasis on complexity analysis and problem-solving.",
         notesCount: 24,
-        materialsCount: 6,
+        materialsCount: 7,
         assignmentsCount: 5,
         progress: 78,
         color: "from-violet-500 to-indigo-500",
@@ -123,23 +123,24 @@ export const courses: Course[] = [
     },
 ];
 
-/** Reusable templates cycled per-course to synthesize "recent materials" without a backend. */
-const materialTemplates: Array<{ suffix: string; type: CourseMaterial["type"]; meta: string }> = [
-    { suffix: "Lecture Slides — Week 1", type: "slides", meta: "3.1 MB" },
-    { suffix: "Lecture Recording — Week 1", type: "video", meta: "42 min" },
-    { suffix: "Reading Assignment", type: "pdf", meta: "1.8 MB" },
-    { suffix: "Lecture Slides — Week 2", type: "slides", meta: "2.6 MB" },
-    { suffix: "Lab Handout", type: "pdf", meta: "640 KB" },
-    { suffix: "Lecture Recording — Week 2", type: "video", meta: "38 min" },
+/** Reusable templates cycled per-course to synthesize a materials library without a backend. */
+const materialTemplates: Array<{ name: string; type: CourseMaterial["type"]; size: string }> = [
+    { name: "Lecture-Slides-Week1.pptx", type: "ppt", size: "3.1 MB" },
+    { name: "Course-Syllabus.pdf", type: "pdf", size: "420 KB" },
+    { name: "Assignment-Brief.docx", type: "doc", size: "180 KB" },
+    { name: "Grade-Tracker.xlsx", type: "xls", size: "96 KB" },
+    { name: "Reference-Diagrams.zip", type: "zip", size: "12.4 MB" },
+    { name: "Whiteboard-Photo.jpg", type: "image", size: "2.8 MB" },
+    { name: "Lecture-Recording-Week1.mp4", type: "video", size: "245 MB" },
 ];
 
 export function getCourseMaterials(course: Course): CourseMaterial[] {
     const count = Math.min(course.materialsCount, materialTemplates.length);
     return materialTemplates.slice(0, count).map((tpl, i) => ({
         id: `${course.id}-material-${i + 1}`,
-        title: tpl.suffix,
+        name: tpl.name,
         type: tpl.type,
-        meta: tpl.meta,
+        size: tpl.size,
         updatedAt: `${i + 1}d ago`,
     }));
 }

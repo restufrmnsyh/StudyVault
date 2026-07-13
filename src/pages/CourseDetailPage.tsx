@@ -3,12 +3,18 @@ import {
     ArrowLeft,
     BookOpen,
     ClipboardList,
+    Download,
+    Eye,
+    FileArchive,
+    FileImage,
+    FileSpreadsheet,
     FileText,
+    FileType2,
+    FileVideo,
     Layers,
-    TrendingUp,
-    Video,
     Presentation,
-    File as FileIcon,
+    TrendingUp,
+    type LucideIcon,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar } from "@/components/common";
@@ -35,11 +41,48 @@ const stagger = {
     },
 };
 
-const materialIcon: Record<CourseMaterial["type"], typeof FileIcon> = {
+const materialIcon: Record<CourseMaterial["type"], LucideIcon> = {
     pdf: FileText,
-    video: Video,
-    slides: Presentation,
+    ppt: Presentation,
+    doc: FileType2,
+    xls: FileSpreadsheet,
+    zip: FileArchive,
+    image: FileImage,
+    video: FileVideo,
 };
+
+const materialTypeLabel: Record<CourseMaterial["type"], string> = {
+    pdf: "PDF",
+    ppt: "PowerPoint",
+    doc: "Word",
+    xls: "Excel",
+    zip: "ZIP",
+    image: "Image",
+    video: "Video",
+};
+
+const actionButtonClass =
+    "flex h-7 items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 text-[11px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400";
+
+/**
+ * Preview/Download pair for a single material row. Kept local to this file (not exported
+ * to components/common) since it's a one-off composition of existing button styling used
+ * only inside the Materials Library — extracting it to a shared file wasn't warranted.
+ */
+function MaterialActions({ material }: { material: CourseMaterial }) {
+    return (
+        <>
+            <button type="button" aria-label={`Preview ${material.name}`} className={actionButtonClass}>
+                <Eye className="h-3 w-3" />
+                <span className="hidden sm:inline">Preview</span>
+            </button>
+            <button type="button" aria-label={`Download ${material.name}`} className={actionButtonClass}>
+                <Download className="h-3 w-3" />
+                <span className="hidden sm:inline">Download</span>
+            </button>
+        </>
+    );
+}
 
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
     const course = courses.find((c) => c.id === courseId);
@@ -160,54 +203,54 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     <ProgressBar progress={course.progress} delay={0.3} />
                 </motion.div>
 
-                {/* Recent Materials + Recent Notes */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
-                        <SectionCard icon={Layers} title="Recent Materials">
-                            {materials.length > 0 ? (
-                                <div className="divide-y divide-zinc-800/60">
-                                    {materials.map((material) => (
-                                        <ListRow
-                                            key={material.id}
-                                            icon={materialIcon[material.type]}
-                                            title={material.title}
-                                            subtitle={material.meta}
-                                            trailing={material.updatedAt}
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
-                                    <Layers className="mb-3 h-6 w-6 text-text-muted" />
-                                    <p className="text-[13px] font-medium text-text-primary">No materials yet</p>
-                                    <p className="mt-1 text-[12px] text-text-muted">
-                                        Materials for this course haven't been added.
-                                    </p>
-                                </div>
-                            )}
-                        </SectionCard>
-                    </motion.div>
+                {/* Materials Library */}
+                <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
+                    <SectionCard icon={Layers} title="Materials Library">
+                        {materials.length > 0 ? (
+                            <div className="divide-y divide-zinc-800/60">
+                                {materials.map((material) => (
+                                    <ListRow
+                                        key={material.id}
+                                        icon={materialIcon[material.type]}
+                                        title={material.name}
+                                        subtitle={`${materialTypeLabel[material.type]} · ${material.size}`}
+                                        trailing={material.updatedAt}
+                                        actions={<MaterialActions material={material} />}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
+                                <Layers className="mb-3 h-6 w-6 text-text-muted" />
+                                <p className="text-[13px] font-medium text-text-primary">No materials yet</p>
+                                <p className="mt-1 text-[12px] text-text-muted">
+                                    Materials for this course haven't been uploaded.
+                                </p>
+                            </div>
+                        )}
+                    </SectionCard>
+                </motion.div>
 
-                    <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
-                        <SectionCard icon={FileText} title="Recent Notes">
-                            {notes.length > 0 ? (
-                                <div className="divide-y divide-zinc-800/60">
-                                    {notes.map((note) => (
-                                        <ListRow key={note.id} title={note.title} subtitle={course.code} trailing={note.updatedAt} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
-                                    <FileText className="mb-3 h-6 w-6 text-text-muted" />
-                                    <p className="text-[13px] font-medium text-text-primary">No notes yet</p>
-                                    <p className="mt-1 text-[12px] text-text-muted">
-                                        Notes for this course haven't been added.
-                                    </p>
-                                </div>
-                            )}
-                        </SectionCard>
-                    </motion.div>
-                </div>
+                {/* Recent Notes */}
+                <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.3 }}>
+                    <SectionCard icon={FileText} title="Recent Notes">
+                        {notes.length > 0 ? (
+                            <div className="divide-y divide-zinc-800/60">
+                                {notes.map((note) => (
+                                    <ListRow key={note.id} title={note.title} subtitle={course.code} trailing={note.updatedAt} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
+                                <FileText className="mb-3 h-6 w-6 text-text-muted" />
+                                <p className="text-[13px] font-medium text-text-primary">No notes yet</p>
+                                <p className="mt-1 text-[12px] text-text-muted">
+                                    Notes for this course haven't been added.
+                                </p>
+                            </div>
+                        )}
+                    </SectionCard>
+                </motion.div>
             </div>
         </DashboardLayout>
     );
