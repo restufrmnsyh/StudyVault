@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { LandingPage } from "@/pages/LandingPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { CoursesPage } from "@/pages/CoursesPage";
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash);
@@ -19,7 +20,11 @@ function useHashRoute() {
 export default function App() {
   const hash = useHashRoute();
 
-  // Any hash starting with #/dashboard renders the dashboard
+  if (hash.startsWith("#/dashboard/courses")) {
+    return <CoursesPage />;
+  }
+
+  // Any other hash starting with #/dashboard renders the dashboard overview
   if (hash.startsWith("#/dashboard")) {
     return <DashboardPage />;
   }

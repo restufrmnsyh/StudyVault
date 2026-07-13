@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Play, BookOpen } from "lucide-react";
+import { ProgressBar } from "@/components/common";
 
 const featuredCourse = {
   title: "Data Structures & Algorithms",
@@ -49,14 +50,7 @@ export function ContinueLearning() {
                   {featuredCourse.progress}%
                 </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-                <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${featuredCourse.progress}%` }}
-                  transition={{ duration: 0.8, delay: 0.4, ease: [0.25, 0.4, 0.25, 1] }}
-                />
-              </div>
+              <ProgressBar progress={featuredCourse.progress} delay={0.4} />
             </div>
           </div>
 
