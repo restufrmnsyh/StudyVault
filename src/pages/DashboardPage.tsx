@@ -9,10 +9,12 @@ import {
 export function DashboardPage() {
   return (
     <DashboardLayout>
-      <Greeting />
-      <OverviewCards />
-      <ContinueLearning />
-      <RecentNotes />
+      <div className="space-y-6 lg:space-y-8">
+        <Greeting />
+        <OverviewCards />
+        <ContinueLearning />
+        <RecentNotes />
+      </div>
     </DashboardLayout>
   );
 }

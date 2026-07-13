@@ -20,7 +20,7 @@ const cardVariant = {
 export function OverviewCards() {
   return (
     <motion.div
-      className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
       variants={stagger}
       initial="hidden"
       animate="visible"
@@ -30,11 +30,12 @@ export function OverviewCards() {
           key={stat.label}
           variants={cardVariant}
           whileHover={{ y: -4, transition: { duration: 0.25, ease: "easeOut" } }}
-          className="group rounded-2xl border border-zinc-800 bg-zinc-900 p-5 transition-shadow duration-300 hover:shadow-lg hover:shadow-violet-500/[0.03]"
+          whileTap={{ scale: 0.98 }}
+          className="group rounded-2xl border border-zinc-800 bg-zinc-900 p-5 transition-colors duration-300 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/[0.04]"
         >
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div
-              className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${stat.color} shadow-sm`}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${stat.color} shadow-sm transition-transform duration-300 group-hover:scale-105`}
             >
               <stat.icon className="h-4 w-4 text-white" />
             </div>
@@ -44,8 +45,8 @@ export function OverviewCards() {
               </span>
             )}
           </div>
-          <p className="text-2xl font-bold text-text-primary">{stat.value}</p>
-          <p className="mt-0.5 text-[13px] text-text-muted">{stat.label}</p>
+          <p className="text-2xl font-bold tabular-nums text-text-primary">{stat.value}</p>
+          <p className="mt-1 text-[13px] text-text-muted">{stat.label}</p>
         </motion.div>
       ))}
     </motion.div>

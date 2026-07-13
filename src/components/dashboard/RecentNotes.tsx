@@ -9,7 +9,7 @@ const recentNotes = [
   { id: "5", title: "Graph Traversal: BFS vs DFS", course: "CS201", time: "3d ago" },
 ];
 
-const fadeInUp = {
+const containerVariant = {
   hidden: { opacity: 0, y: 16 },
   visible: {
     opacity: 1,
@@ -18,16 +18,32 @@ const fadeInUp = {
   },
 };
 
+const listVariant = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.05, delayChildren: 0.45 },
+  },
+};
+
+const rowVariant = {
+  hidden: { opacity: 0, x: -8 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.35, ease: [0.25, 0.4, 0.25, 1] as const },
+  },
+};
+
 export function RecentNotes() {
   return (
     <motion.div
-      variants={fadeInUp}
+      variants={containerVariant}
       initial="hidden"
       animate="visible"
       className="rounded-2xl border border-zinc-800 bg-zinc-900"
     >
       <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-        <div className="flex items-center gap-2 text-[13px] font-medium text-text-muted">
+        <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-text-muted">
           <FileText className="h-3.5 w-3.5" />
           Recent Notes
         </div>
@@ -36,26 +52,32 @@ export function RecentNotes() {
         </button>
       </div>
 
-      <div className="divide-y divide-zinc-800/60">
+      <motion.div
+        className="divide-y divide-zinc-800/60"
+        variants={listVariant}
+        initial="hidden"
+        animate="visible"
+      >
         {recentNotes.map((note) => (
-          <button
+          <motion.button
             key={note.id}
-            className="group flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors duration-200 hover:bg-white/[0.02]"
+            variants={rowVariant}
+            className="group flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors duration-200 hover:bg-white/[0.03]"
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-medium text-text-primary transition-colors group-hover:text-violet-400">
                 {note.title}
               </p>
-              <p className="mt-0.5 text-[11px] text-text-muted">
+              <p className="mt-1 text-[11px] text-text-muted">
                 {note.course}
               </p>
             </div>
-            <span className="ml-4 flex-shrink-0 text-[11px] text-text-muted">
+            <span className="ml-4 flex-shrink-0 text-[11px] text-text-muted transition-transform duration-200 group-hover:-translate-x-0.5">
               {note.time}
             </span>
-          </button>
+          </motion.button>
         ))}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }

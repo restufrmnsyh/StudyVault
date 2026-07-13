@@ -131,7 +131,7 @@ export function Hero() {
           >
             {/* Primary CTA */}
             <a
-              href="#"
+              href="#/dashboard"
               className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-xl px-8 py-3.5 text-[15px] font-semibold text-white transition-all duration-300 hover:scale-[1.03]"
             >
               {/* Button gradient background */}

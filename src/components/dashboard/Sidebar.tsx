@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { motion } from "framer-motion";
 import { GraduationCap, ChevronsLeft, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sidebarItems, currentUser } from "@/data/dashboard";
@@ -18,6 +19,11 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
     },
     [onClose],
   );
+
+  const handleBackToSite = useCallback(() => {
+    window.location.hash = "";
+    onClose?.();
+  }, [onClose]);
 
   return (
     <aside
@@ -44,7 +50,7 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
         <button
           onClick={onToggle}
           className={cn(
-            "hidden items-center justify-center rounded-md text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary lg:flex",
+            "hidden items-center justify-center rounded-md text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary md:flex",
             collapsed ? "h-7 w-7" : "h-6 w-6",
           )}
           aria-label="Toggle sidebar"
@@ -65,16 +71,23 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
               key={item.label}
               onClick={() => handleNavClick(item.href)}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors duration-200",
+                "relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors duration-200",
                 isActive
-                  ? "bg-violet-500/10 font-medium text-violet-400"
+                  ? "font-medium text-violet-400"
                   : "text-text-muted hover:bg-white/[0.04] hover:text-text-secondary",
                 collapsed && "justify-center px-0",
               )}
               title={collapsed ? item.label : undefined}
             >
-              <item.icon className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 rounded-lg bg-violet-500/10"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              )}
+              <item.icon className="relative z-10 h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="relative z-10 truncate">{item.label}</span>}
             </button>
           );
         })}
@@ -103,8 +116,10 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
           )}
           {!collapsed && (
             <button
+              onClick={handleBackToSite}
               className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary"
-              aria-label="Sign out"
+              aria-label="Back to site"
+              title="Back to site"
             >
               <LogOut className="h-3 w-3" />
             </button>

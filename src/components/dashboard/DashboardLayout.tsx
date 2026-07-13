@@ -61,7 +61,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <Topbar onMenuToggle={toggleMobileMenu} />
 
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
-          <div className="mx-auto w-full max-w-[1400px] p-4 lg:p-6">
+          <div className="mx-auto w-full max-w-[1400px] p-4 lg:p-6 xl:p-8">
             {children}
           </div>
         </main>

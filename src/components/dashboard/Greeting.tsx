@@ -19,16 +19,11 @@ const fadeInUp = {
 
 export function Greeting() {
   return (
-    <motion.div
-      variants={fadeInUp}
-      initial="hidden"
-      animate="visible"
-      className="mb-6"
-    >
-      <h1 className="text-2xl font-bold text-text-primary sm:text-3xl">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible">
+      <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
         {getGreeting()} 👋
       </h1>
-      <p className="mt-1 text-[15px] text-text-muted">
+      <p className="mt-1.5 text-[15px] text-text-muted">
         Welcome back, {currentUser.name.split(" ")[0]}.
       </p>
     </motion.div>

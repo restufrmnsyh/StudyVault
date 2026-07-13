@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   BookOpen,
@@ -31,12 +32,19 @@ export function MobileNav({ currentPath }: MobileNavProps) {
               key={item.label}
               href={`#${item.href}`}
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-[10px] transition-colors duration-200",
+                "relative flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-[10px] transition-colors duration-200",
                 isActive
                   ? "font-medium text-violet-400"
                   : "text-text-muted",
               )}
             >
+              {isActive && (
+                <motion.div
+                  layoutId="mobilenav-active-dot"
+                  className="absolute top-0 h-1 w-1 rounded-full bg-violet-400"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              )}
               <item.icon className={cn("h-5 w-5", isActive && "text-violet-400")} />
               {item.label}
             </a>
