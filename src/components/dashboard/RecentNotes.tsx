@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { FileText } from "lucide-react";
+import { SectionCard, ListRow } from "@/components/common";
 
 const recentNotes = [
   { id: "1", title: "Binary Search Trees — Insertion & Deletion", course: "CS201", time: "2h ago" },
@@ -36,48 +37,21 @@ const rowVariant = {
 
 export function RecentNotes() {
   return (
-    <motion.div
-      variants={containerVariant}
-      initial="hidden"
-      animate="visible"
-      className="rounded-2xl border border-zinc-800 bg-zinc-900"
-    >
-      <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-        <div className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-text-muted">
-          <FileText className="h-3.5 w-3.5" />
-          Recent Notes
-        </div>
-        <button className="text-[12px] font-medium text-violet-400 transition-colors hover:text-violet-300">
-          View All
-        </button>
-      </div>
-
-      <motion.div
-        className="divide-y divide-zinc-800/60"
-        variants={listVariant}
-        initial="hidden"
-        animate="visible"
-      >
-        {recentNotes.map((note) => (
-          <motion.button
-            key={note.id}
-            variants={rowVariant}
-            className="group flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors duration-200 hover:bg-white/[0.03]"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium text-text-primary transition-colors group-hover:text-violet-400">
-                {note.title}
-              </p>
-              <p className="mt-1 text-[11px] text-text-muted">
-                {note.course}
-              </p>
-            </div>
-            <span className="ml-4 flex-shrink-0 text-[11px] text-text-muted transition-transform duration-200 group-hover:-translate-x-0.5">
-              {note.time}
-            </span>
-          </motion.button>
-        ))}
-      </motion.div>
+    <motion.div variants={containerVariant} initial="hidden" animate="visible">
+      <SectionCard icon={FileText} title="Recent Notes" action={{ label: "View All" }}>
+        <motion.div
+          className="divide-y divide-zinc-800/60"
+          variants={listVariant}
+          initial="hidden"
+          animate="visible"
+        >
+          {recentNotes.map((note) => (
+            <motion.div key={note.id} variants={rowVariant}>
+              <ListRow title={note.title} subtitle={note.course} trailing={note.time} />
+            </motion.div>
+          ))}
+        </motion.div>
+      </SectionCard>
     </motion.div>
   );
 }

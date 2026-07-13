@@ -64,8 +64,11 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {sidebarItems.map((item) => {
-          const isActive = currentPath === item.href.replace("#", "") ||
-            (item.href === "#/dashboard" && currentPath === "/dashboard");
+          const itemPath = item.href.replace("#", "");
+          const isActive =
+            itemPath === "/dashboard"
+              ? currentPath === "/dashboard"
+              : currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
           return (
             <button
               key={item.label}

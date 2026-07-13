@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { LandingPage } from "@/pages/LandingPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CoursesPage } from "@/pages/CoursesPage";
+import { CourseDetailPage } from "@/pages/CourseDetailPage";
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash);
@@ -19,6 +20,11 @@ function useHashRoute() {
 
 export default function App() {
   const hash = useHashRoute();
+
+  const courseDetailMatch = hash.match(/^#\/dashboard\/courses\/([^/]+)/);
+  if (courseDetailMatch) {
+    return <CourseDetailPage courseId={courseDetailMatch[1]} />;
+  }
 
   if (hash.startsWith("#/dashboard/courses")) {
     return <CoursesPage />;

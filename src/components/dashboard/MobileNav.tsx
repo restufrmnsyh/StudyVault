@@ -25,8 +25,10 @@ export function MobileNav({ currentPath }: MobileNavProps) {
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/[0.06] bg-[#0a0a0d]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden">
       <div className="flex items-center justify-around px-2 py-1.5">
         {mobileItems.map((item) => {
-          const isActive = currentPath === item.href ||
-            (item.href === "/dashboard" && currentPath === "/dashboard");
+          const isActive =
+            item.href === "/dashboard"
+              ? currentPath === "/dashboard"
+              : currentPath === item.href || currentPath.startsWith(`${item.href}/`);
           return (
             <a
               key={item.label}

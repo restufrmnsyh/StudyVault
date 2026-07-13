@@ -20,7 +20,8 @@ const cardVariant = {
 
 export function CourseCard({ course, index = 0 }: CourseCardProps) {
     return (
-        <motion.div
+        <motion.a
+            href={`#/dashboard/courses/${course.id}`}
             variants={cardVariant}
             whileHover={{ y: -4, transition: { duration: 0.25, ease: "easeOut" } }}
             whileTap={{ scale: 0.98 }}
@@ -52,6 +53,6 @@ export function CourseCard({ course, index = 0 }: CourseCardProps) {
                 </div>
                 <ProgressBar progress={course.progress} delay={0.1 + Math.min(index, 8) * 0.03} />
             </div>
-        </motion.div>
+        </motion.a>
     );
 }
