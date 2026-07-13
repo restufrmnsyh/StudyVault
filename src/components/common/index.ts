@@ -4,3 +4,4 @@ export { ProgressBar } from "./ProgressBar";
 export { StatCard } from "./StatCard";
 export { SectionCard } from "./SectionCard";
 export { ListRow } from "./ListRow";
+export { EmptyState } from "./EmptyState";

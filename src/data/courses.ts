@@ -1,4 +1,4 @@
-import type { Course, CourseMaterial, CourseNote } from "@/types/courses";
+import type { Course, CourseMaterial, CourseNote, CourseAssignment, CourseActivity } from "@/types/courses";
 
 export const semesters: string[] = [
     "All Semesters",
@@ -75,7 +75,7 @@ export const courses: Course[] = [
             "Foundational course covering logic, set theory, combinatorics, and graph theory — the mathematical backbone of computer science.",
         notesCount: 30,
         materialsCount: 3,
-        assignmentsCount: 5,
+        assignmentsCount: 0,
         progress: 100,
         color: "from-pink-500 to-rose-500",
     },
@@ -160,5 +160,48 @@ export function getCourseNotes(course: Course): CourseNote[] {
         id: `${course.id}-note-${i + 1}`,
         title: `${title} — ${course.code}`,
         updatedAt: `${i + 1}d ago`,
+    }));
+}
+
+const assignmentTemplates: Array<{
+    title: string;
+    dueDate: string;
+    priority: CourseAssignment["priority"];
+    status: CourseAssignment["status"];
+}> = [
+        { title: "Problem Set 4", dueDate: "Jul 18", priority: "high", status: "pending" },
+        { title: "Lab Report — Week 5", dueDate: "Jul 21", priority: "medium", status: "in-progress" },
+        { title: "Reading Reflection", dueDate: "Jul 25", priority: "low", status: "pending" },
+        { title: "Midterm Project Proposal", dueDate: "Jul 29", priority: "high", status: "in-progress" },
+        { title: "Group Presentation Slides", dueDate: "Aug 2", priority: "medium", status: "submitted" },
+        { title: "Final Quiz Prep", dueDate: "Aug 6", priority: "low", status: "pending" },
+    ];
+
+export function getCourseAssignments(course: Course): CourseAssignment[] {
+    const count = Math.min(course.assignmentsCount, assignmentTemplates.length);
+    return assignmentTemplates.slice(0, count).map((tpl, i) => ({
+        id: `${course.id}-assignment-${i + 1}`,
+        ...tpl,
+    }));
+}
+
+const activityTemplates: Array<{ type: CourseActivity["type"]; description: string }> = [
+    { type: "viewed", description: "Viewed Week 4.pdf" },
+    { type: "edited", description: "Edited AVL Tree Notes" },
+    { type: "downloaded", description: "Downloaded Lecture Slides" },
+    { type: "created", description: "Created a new note" },
+    { type: "uploaded", description: "Uploaded Assignment Draft" },
+];
+
+export function getCourseActivity(course: Course): CourseActivity[] {
+    // Deliberately empty for this course — materials haven't been uploaded yet, so
+    // there's nothing to show in the feed. Demonstrates the Recent Activity empty state.
+    if (course.id === "6") return [];
+
+    return activityTemplates.map((tpl, i) => ({
+        id: `${course.id}-activity-${i + 1}`,
+        type: tpl.type,
+        description: tpl.description,
+        updatedAt: `${i + 1}h ago`,
     }));
 }

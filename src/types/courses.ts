@@ -29,3 +29,23 @@ export interface CourseNote {
     title: string;
     updatedAt: string;
 }
+
+export type AssignmentPriority = "high" | "medium" | "low";
+export type AssignmentStatus = "pending" | "in-progress" | "submitted";
+
+export interface CourseAssignment {
+    id: string;
+    title: string;
+    dueDate: string;
+    priority: AssignmentPriority;
+    status: AssignmentStatus;
+}
+
+export type ActivityType = "viewed" | "edited" | "downloaded" | "uploaded" | "created";
+
+export interface CourseActivity {
+    id: string;
+    type: ActivityType;
+    description: string;
+    updatedAt: string;
+}

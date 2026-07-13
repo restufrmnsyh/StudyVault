@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const statCardVariant = {
     hidden: { opacity: 0, y: 16 },
@@ -17,19 +18,45 @@ interface StatCardProps {
     /** Tailwind gradient stops, e.g. "from-violet-500 to-indigo-500" */
     color: string;
     trend?: string;
+    /**
+     * Tighter padding/gaps below the `sm` breakpoint (<640px), for dense mobile grids
+     * like Course Detail's 2-column stats. Tablet and desktop appearance is byte-for-byte
+     * unchanged either way — this only affects the base (mobile) utility classes.
+     * Defaults to false so existing call sites (e.g. the Dashboard) are unaffected.
+     */
+    compactOnMobile?: boolean;
 }
 
-export function StatCard({ icon: Icon, value, label, color, trend }: StatCardProps) {
+export function StatCard({
+    icon: Icon,
+    value,
+    label,
+    color,
+    trend,
+    compactOnMobile = false,
+}: StatCardProps) {
     return (
         <motion.div
             variants={statCardVariant}
             whileHover={{ y: -4, transition: { duration: 0.25, ease: "easeOut" } }}
             whileTap={{ scale: 0.98 }}
-            className="group rounded-2xl border border-zinc-800 bg-zinc-900 p-5 transition-colors duration-300 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/[0.04]"
+            className={cn(
+                "group rounded-2xl border border-zinc-800 bg-zinc-900 transition-colors duration-300 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/[0.04]",
+                compactOnMobile ? "p-3 sm:p-5" : "p-5",
+            )}
         >
-            <div className="mb-4 flex items-center justify-between">
+            <div
+                className={cn(
+                    "flex items-center justify-between",
+                    compactOnMobile ? "mb-2 sm:mb-4" : "mb-4",
+                )}
+            >
                 <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${color} shadow-sm transition-transform duration-300 group-hover:scale-105`}
+                    className={cn(
+                        "flex items-center justify-center rounded-xl bg-gradient-to-br shadow-sm transition-transform duration-300 group-hover:scale-105",
+                        color,
+                        compactOnMobile ? "h-8 w-8 sm:h-9 sm:w-9" : "h-9 w-9",
+                    )}
                 >
                     <Icon className="h-4 w-4 text-white" />
                 </div>
@@ -39,8 +66,22 @@ export function StatCard({ icon: Icon, value, label, color, trend }: StatCardPro
                     </span>
                 )}
             </div>
-            <p className="text-2xl font-bold tabular-nums text-text-primary">{value}</p>
-            <p className="mt-1 text-[13px] text-text-muted">{label}</p>
+            <p
+                className={cn(
+                    "font-bold tabular-nums text-text-primary",
+                    compactOnMobile ? "text-xl sm:text-2xl" : "text-2xl",
+                )}
+            >
+                {value}
+            </p>
+            <p
+                className={cn(
+                    "text-text-muted",
+                    compactOnMobile ? "mt-0.5 text-[12px] sm:mt-1 sm:text-[13px]" : "mt-1 text-[13px]",
+                )}
+            >
+                {label}
+            </p>
         </motion.div>
     );
 }
