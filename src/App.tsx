@@ -5,6 +5,8 @@ import { CoursesPage } from "@/pages/CoursesPage";
 import { CourseDetailPage } from "@/pages/CourseDetailPage";
 import { NotesPage } from "@/pages/NotesPage";
 import { NoteDetailPage } from "@/pages/NoteDetailPage";
+import { NotesProvider } from "@/context/NotesProvider";
+import { ToastProvider } from "@/context/ToastProvider";
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash);
@@ -20,7 +22,7 @@ function useHashRoute() {
   return hash;
 }
 
-export default function App() {
+function Router() {
   const hash = useHashRoute();
 
   const courseDetailMatch = hash.match(/^#\/dashboard\/courses\/([^/]+)/);
@@ -47,4 +49,14 @@ export default function App() {
   }
 
   return <LandingPage />;
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <NotesProvider>
+        <Router />
+      </NotesProvider>
+    </ToastProvider>
+  );
 }

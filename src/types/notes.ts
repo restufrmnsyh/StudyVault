@@ -14,6 +14,9 @@ export interface Note {
     archived: boolean;
     /** Display string, e.g. "May 12, 2026" — when the note was first created */
     createdDate: string;
+    /** The note's body. Lives directly on the note (rather than being derived on every
+     *  render) so edits can be saved to state and persisted to localStorage as plain data. */
+    content: NoteContentBlock[];
 }
 
 export type NoteFilterKey = "all" | "favorites" | "recent" | "archived";

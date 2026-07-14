@@ -1,6 +1,6 @@
 import type { Note, NoteActivityItem, NoteContentBlock, NoteMaterial } from "@/types/notes";
 
-export const notes: Note[] = [
+const rawNotes: Omit<Note, "content">[] = [
     {
         id: "1",
         title: "Binary Search Trees — Insertion & Deletion",
@@ -124,6 +124,10 @@ export const notes: Note[] = [
     },
 ];
 
+/** The array the rest of the app actually imports — same dummy notes, with `content`
+ *  computed once up front so it's part of the plain-data shape that gets persisted. */
+export const notes: Note[] = rawNotes.map((note) => ({ ...note, content: getNoteContent(note) }));
+
 /**
  * Structured dummy body for the Note Detail page. One shared template covering every
  * required block type (headings, paragraphs, both list types, a code block, a quote) —
@@ -131,7 +135,7 @@ export const notes: Note[] = [
  * author real per-note content. Swapping this for persisted content later only means
  * changing what this function returns, not how NoteContentBlocks renders it.
  */
-export function getNoteContent(note: Note): NoteContentBlock[] {
+export function getNoteContent(note: Pick<Note, "preview" | "tags">): NoteContentBlock[] {
     return [
         { kind: "heading", level: 2, text: "Overview" },
         { kind: "paragraph", text: note.preview },
@@ -242,4 +246,39 @@ export function getNoteActivity(note: Note): NoteActivityItem[] {
     }
 
     return activity;
+}
+
+/** Flattens a single content block down to plain, searchable text. */
+function blockToSearchText(block: NoteContentBlock): string {
+    switch (block.kind) {
+        case "heading":
+        case "paragraph":
+        case "quote":
+            return block.text;
+        case "bullet-list":
+        case "numbered-list":
+            return block.items.join(" ");
+        case "code":
+            return block.code;
+        default:
+            return "";
+    }
+}
+
+/**
+ * Sprint 3.4D search: matches title, preview, tags, course, and the note body — not just
+ * the metadata NotesPage searched before. Kept here (next to the Note shape it reads)
+ * rather than inline in NotesPage so any future search entry point reuses the same rules.
+ */
+export function noteMatchesQuery(note: Note, query: string): boolean {
+    const q = query.trim().toLowerCase();
+    if (q === "") return true;
+
+    return (
+        note.title.toLowerCase().includes(q) ||
+        note.preview.toLowerCase().includes(q) ||
+        note.courseCode.toLowerCase().includes(q) ||
+        note.tags.some((tag) => tag.toLowerCase().includes(q)) ||
+        note.content.some((block) => blockToSearchText(block).toLowerCase().includes(q))
+    );
 }

@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Archive, Clock, FileText, Plus, Search as SearchIcon, Star } from "lucide-react";
+import { Archive, Clock, FileText, Plus, RotateCcw, Search as SearchIcon, Star } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { SearchInput, EmptyState } from "@/components/common";
+import { SearchInput, EmptyState, ConfirmDialog } from "@/components/common";
 import { NoteCard, NotesFilterSidebar } from "@/components/notes";
-import { notes as initialNotes } from "@/data/notes";
-import type { Note, NoteFilterKey } from "@/types/notes";
+import { noteMatchesQuery } from "@/data/notes";
+import { useNotes } from "@/hooks/useNotes";
+import { useToast } from "@/hooks/useToast";
+import type { NoteFilterKey } from "@/types/notes";
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 16 },
@@ -26,13 +28,12 @@ const gridStagger = {
 const RECENT_THRESHOLD_DAYS = 3;
 
 export function NotesPage() {
-    const [allNotes, setAllNotes] = useState<Note[]>(initialNotes);
+    const { notes: allNotes, toggleFavorite, resetDemoData } = useNotes();
+    const { showToast } = useToast();
+
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<NoteFilterKey>("all");
-
-    const toggleFavorite = (id: string) => {
-        setAllNotes((prev) => prev.map((n) => (n.id === id ? { ...n, favorite: !n.favorite } : n)));
-    };
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
     const counts: Record<NoteFilterKey, number> = useMemo(
         () => ({
@@ -53,14 +54,8 @@ export function NotesPage() {
         else if (filter === "archived") result = result.filter((n) => n.archived);
         else result = result.filter((n) => !n.archived);
 
-        const query = search.trim().toLowerCase();
-        if (query) {
-            result = result.filter(
-                (n) =>
-                    n.title.toLowerCase().includes(query) ||
-                    n.courseCode.toLowerCase().includes(query) ||
-                    n.tags.some((tag) => tag.toLowerCase().includes(query)),
-            );
+        if (search.trim() !== "") {
+            result = result.filter((n) => noteMatchesQuery(n, search));
         }
 
         if (filter === "recent") {
@@ -72,7 +67,11 @@ export function NotesPage() {
 
     const emptyState = useMemo(() => {
         if (search.trim() !== "") {
-            return { icon: SearchIcon, title: "No notes found", description: "Try a different search term or filter." };
+            return {
+                icon: SearchIcon,
+                title: "No notes found",
+                description: "Try a different search term — search now also looks inside note content.",
+            };
         }
         switch (filter) {
             case "favorites":
@@ -90,6 +89,12 @@ export function NotesPage() {
         }
     }, [search, filter]);
 
+    function handleResetConfirmed() {
+        resetDemoData();
+        setShowResetConfirm(false);
+        showToast("Demo data restored");
+    }
+
     return (
         <DashboardLayout>
             <div className="space-y-6 lg:space-y-8">
@@ -106,13 +111,23 @@ export function NotesPage() {
                             {counts.all} notes across your courses.
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        className="group flex items-center gap-2 self-start rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
-                    >
-                        <Plus className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-90" />
-                        New Note
-                    </button>
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowResetConfirm(true)}
+                            className="flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                        >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Reset Demo Data</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
+                        >
+                            <Plus className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-90" />
+                            New Note
+                        </button>
+                    </div>
                 </motion.div>
 
                 {/* Search */}
@@ -120,7 +135,7 @@ export function NotesPage() {
                     <SearchInput
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search notes, courses, or tags..."
+                        placeholder="Search notes, courses, tags, or content..."
                         ariaLabel="Search notes"
                     />
                 </motion.div>
@@ -151,6 +166,18 @@ export function NotesPage() {
                     </div>
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={showResetConfirm}
+                icon={RotateCcw}
+                title="Reset demo data?"
+                description="This clears any local edits, favorites, and archived notes, and restores the original dummy notes."
+                confirmLabel="Reset data"
+                cancelLabel="Cancel"
+                destructive
+                onConfirm={handleResetConfirmed}
+                onCancel={() => setShowResetConfirm(false)}
+            />
         </DashboardLayout>
     );
 }
