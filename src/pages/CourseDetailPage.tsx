@@ -22,6 +22,7 @@ import {
 import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState } from "@/components/common";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
+import { priorityStyle, priorityLabel } from "@/constants/priority";
 import { courses, getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
 import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
@@ -69,16 +70,6 @@ function MaterialActions({ material }: { material: CourseMaterial }) {
     );
 }
 
-const priorityStyle: Record<CourseAssignment["priority"], string> = {
-    high: "bg-rose-500/10 text-rose-400",
-    medium: "bg-amber-500/10 text-amber-400",
-    low: "bg-emerald-500/10 text-emerald-400",
-};
-const priorityLabel: Record<CourseAssignment["priority"], string> = {
-    high: "High",
-    medium: "Medium",
-    low: "Low",
-};
 const statusStyle: Record<CourseAssignment["status"], string> = {
     pending: "bg-white/[0.05] text-text-muted",
     "in-progress": "bg-blue-500/10 text-blue-400",

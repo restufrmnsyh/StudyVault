@@ -5,6 +5,7 @@ import { CoursesPage } from "@/pages/CoursesPage";
 import { CourseDetailPage } from "@/pages/CourseDetailPage";
 import { NotesPage } from "@/pages/NotesPage";
 import { NoteDetailPage } from "@/pages/NoteDetailPage";
+import { PlannerPage } from "@/pages/PlannerPage";
 import { NotesProvider } from "@/context/NotesProvider";
 import { ToastProvider } from "@/context/ToastProvider";
 
@@ -41,6 +42,10 @@ function Router() {
 
   if (hash.startsWith("#/dashboard/notes")) {
     return <NotesPage />;
+  }
+
+  if (hash.startsWith("#/dashboard/planner")) {
+    return <PlannerPage />;
   }
 
   // Any other hash starting with #/dashboard renders the dashboard overview
