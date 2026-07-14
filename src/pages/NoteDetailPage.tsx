@@ -9,23 +9,52 @@ import {
     FilePlus,
     FileText,
     Layers,
+    Lock,
     MoreHorizontal,
     Pencil,
+    Save,
     Star,
     Trash2,
+    X,
     type LucideIcon,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { SectionCard, ListRow, EmptyState } from "@/components/common";
+import { SectionCard, ListRow, EmptyState, ConfirmDialog } from "@/components/common";
 import { NoteContentBlocks, RelatedCourseCard } from "@/components/notes";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
-import { notes, getNoteContent, getRelatedMaterials, getNoteActivity } from "@/data/notes";
+import {
+    notes,
+    getNoteContent,
+    getRelatedMaterials,
+    getNoteActivity,
+    noteContentToPlainText,
+    plainTextToNoteContent,
+} from "@/data/notes";
 import { courses } from "@/data/courses";
-import type { NoteActivityType } from "@/types/notes";
+import type { NoteActivityType, NoteContentBlock } from "@/types/notes";
 import { cn } from "@/lib/utils";
 
 interface NoteDetailPageProps {
     noteId: string;
+}
+
+type NoteDetailMode = "view" | "edit";
+
+/** Session-only edit overrides. Never written back to `data/notes.ts` — Sprint 3.4C is
+ *  explicitly local-state-only, no persistence and no backend. */
+interface NoteOverride {
+    title: string;
+    tags: string[];
+    content: NoteContentBlock[];
+}
+
+/** Draft values bound to the Edit Mode form fields. Kept as its own shape (raw text for
+ *  tags/content) rather than reusing NoteOverride directly, since form inputs need plain
+ *  strings while the committed override needs parsed tags/blocks. */
+interface EditForm {
+    title: string;
+    tagsText: string;
+    contentText: string;
 }
 
 const fadeInUp = {
@@ -50,6 +79,11 @@ const activityLabel: Record<NoteActivityType, string> = {
     viewed: "Viewed this note",
     favorited: "Favorited this note",
 };
+
+/** Shared input/textarea chrome so Edit Mode fields match SearchInput's focus styling
+ *  instead of introducing a second visual language for form controls. */
+const fieldClassName =
+    "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-text-primary outline-none ring-violet-500/15 transition-all duration-200 placeholder:text-text-muted focus:border-violet-500/30 focus:bg-white/[0.04] focus:ring-4";
 
 /**
  * "More actions" menu for the header. New (not in components/common yet) because it's
@@ -98,6 +132,13 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
     const note = notes.find((n) => n.id === noteId);
     const [favorite, setFavorite] = useState(note?.favorite ?? false);
 
+    // Edit Mode state. `override` holds the last *saved* (session-only) edits; `form`
+    // holds the in-progress draft while `mode === "edit"` and is discarded on Cancel.
+    const [mode, setMode] = useState<NoteDetailMode>("view");
+    const [override, setOverride] = useState<NoteOverride | null>(null);
+    const [form, setForm] = useState<EditForm | null>(null);
+    const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
     if (!note) {
         return (
             <DashboardLayout>
@@ -115,10 +156,60 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
         );
     }
 
-    const content = getNoteContent(note);
+    // Effective values: the override if this session has saved an edit, otherwise the
+    // original dummy data. Every view below reads through these, never `note.*` directly,
+    // so Edit Mode and View Mode never fall out of sync with each other.
+    const displayTitle = override?.title ?? note.title;
+    const displayTags = override?.tags ?? note.tags;
+    const displayContent = override?.content ?? getNoteContent(note);
+
     const materials = getRelatedMaterials(note);
     const activity = getNoteActivity(note);
     const relatedCourse = courses.find((c) => c.code === note.courseCode);
+
+    const isDirty =
+        form !== null &&
+        (form.title.trim() !== displayTitle ||
+            form.tagsText.trim() !== displayTags.join(", ") ||
+            form.contentText.trim() !== noteContentToPlainText(displayContent).trim());
+
+    function startEdit() {
+        setForm({
+            title: displayTitle,
+            tagsText: displayTags.join(", "),
+            contentText: noteContentToPlainText(displayContent),
+        });
+        setMode("edit");
+    }
+
+    function exitEditMode() {
+        setForm(null);
+        setMode("view");
+        setShowDiscardConfirm(false);
+    }
+
+    function handleCancel() {
+        if (isDirty) {
+            setShowDiscardConfirm(true);
+        } else {
+            exitEditMode();
+        }
+    }
+
+    function handleSave() {
+        if (!form || form.title.trim() === "") return;
+        setOverride({
+            title: form.title.trim(),
+            tags: form.tagsText
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean),
+            content: plainTextToNoteContent(form.contentText),
+        });
+        exitEditMode();
+    }
+
+    const isEditing = mode === "edit" && form !== null;
 
     return (
         <DashboardLayout>
@@ -141,63 +232,122 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                 >
                     <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
-                            <span className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[11px] font-medium text-text-muted">
+                            <span
+                                title="Course is read-only in Edit Mode"
+                                className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[11px] font-medium text-text-muted"
+                            >
+                                {isEditing && <Lock className="h-2.5 w-2.5" />}
                                 {note.courseCode}
                             </span>
-                            <h1 className="mt-2.5 text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
-                                {note.title}
-                            </h1>
 
-                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-text-muted">
-                                <span className="flex items-center gap-1.5">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    Edited {note.lastEdited}
-                                </span>
-                                <span className="flex items-center gap-1.5">
-                                    <CalendarDays className="h-3.5 w-3.5" />
-                                    Created {note.createdDate}
-                                </span>
-                            </div>
-
-                            {note.tags.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {note.tags.map((tag) => (
-                                        <span
-                                            key={tag}
-                                            className="rounded-md bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-text-muted"
-                                        >
-                                            #{tag}
-                                        </span>
-                                    ))}
+                            {isEditing && form ? (
+                                <div className="mt-2.5 space-y-3">
+                                    <div>
+                                        <label htmlFor="note-title" className="sr-only">
+                                            Note title
+                                        </label>
+                                        <input
+                                            id="note-title"
+                                            type="text"
+                                            value={form.title}
+                                            onChange={(e) => setForm({ ...form, title: e.target.value })}
+                                            placeholder="Note title"
+                                            className={cn(fieldClassName, "text-xl font-bold tracking-tight sm:text-2xl")}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="note-tags" className="mb-1.5 block text-[11px] font-medium text-text-muted">
+                                            Tags <span className="font-normal">(comma-separated)</span>
+                                        </label>
+                                        <input
+                                            id="note-tags"
+                                            type="text"
+                                            value={form.tagsText}
+                                            onChange={(e) => setForm({ ...form, tagsText: e.target.value })}
+                                            placeholder="algorithms, exam-prep"
+                                            className={cn(fieldClassName, "text-[13px]")}
+                                        />
+                                    </div>
                                 </div>
+                            ) : (
+                                <>
+                                    <h1 className="mt-2.5 text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
+                                        {displayTitle}
+                                    </h1>
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-text-muted">
+                                        <span className="flex items-center gap-1.5">
+                                            <Clock className="h-3.5 w-3.5" />
+                                            Edited {note.lastEdited}
+                                        </span>
+                                        <span className="flex items-center gap-1.5">
+                                            <CalendarDays className="h-3.5 w-3.5" />
+                                            Created {note.createdDate}
+                                        </span>
+                                    </div>
+
+                                    {displayTags.length > 0 && (
+                                        <div className="mt-3 flex flex-wrap gap-1.5">
+                                            {displayTags.map((tag) => (
+                                                <span
+                                                    key={tag}
+                                                    className="rounded-md bg-white/[0.03] px-2 py-0.5 text-[11px] font-medium text-text-muted"
+                                                >
+                                                    #{tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
-                        <div className="flex flex-shrink-0 items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setFavorite((v) => !v)}
-                                aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
-                                aria-pressed={favorite}
-                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-violet-500/30"
-                            >
-                                <Star
-                                    className={cn(
-                                        "h-4 w-4 transition-colors",
-                                        favorite ? "fill-amber-400 text-amber-400" : "text-text-muted",
-                                    )}
-                                />
-                            </button>
-                            <MoreActionsMenu />
-                        </div>
+                        {!isEditing && (
+                            <div className="flex flex-shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setFavorite((v) => !v)}
+                                    aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
+                                    aria-pressed={favorite}
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-violet-500/30"
+                                >
+                                    <Star
+                                        className={cn(
+                                            "h-4 w-4 transition-colors",
+                                            favorite ? "fill-amber-400 text-amber-400" : "text-text-muted",
+                                        )}
+                                    />
+                                </button>
+                                <MoreActionsMenu />
+                            </div>
+                        )}
                     </div>
                 </motion.div>
 
                 {/* Note content */}
                 <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.1 }}>
-                    <SectionCard icon={FileText} title="Note Content">
+                    <SectionCard icon={FileText} title={isEditing ? "Edit Content" : "Note Content"}>
                         <div className="p-5 sm:p-6">
-                            <NoteContentBlocks blocks={content} />
+                            {isEditing && form ? (
+                                <div>
+                                    <label htmlFor="note-content" className="sr-only">
+                                        Note content
+                                    </label>
+                                    <textarea
+                                        id="note-content"
+                                        value={form.contentText}
+                                        onChange={(e) => setForm({ ...form, contentText: e.target.value })}
+                                        placeholder="Write your note..."
+                                        rows={14}
+                                        className={cn(fieldClassName, "resize-y text-[14px] leading-relaxed")}
+                                    />
+                                    <p className="mt-2 text-[11.5px] text-text-muted">
+                                        Plain text only — leave a blank line between paragraphs.
+                                    </p>
+                                </div>
+                            ) : (
+                                <NoteContentBlocks blocks={displayContent} />
+                            )}
                         </div>
                     </SectionCard>
                 </motion.div>
@@ -270,22 +420,58 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                     transition={{ delay: 0.3 }}
                     className="flex flex-col-reverse gap-3 border-t border-zinc-800 pt-6 sm:flex-row sm:items-center sm:justify-between"
                 >
-                    <button
-                        type="button"
-                        className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.03] px-5 py-2.5 text-[13px] font-semibold text-rose-400 transition-colors hover:bg-rose-500/[0.08]"
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete Note
-                    </button>
-                    <button
-                        type="button"
-                        className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
-                    >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit Note
-                    </button>
+                    {isEditing ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                                className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-2.5 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-white/[0.05] hover:text-text-primary"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSave}
+                                disabled={form?.title.trim() === ""}
+                                className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none"
+                            >
+                                <Save className="h-3.5 w-3.5" />
+                                Save Changes
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.03] px-5 py-2.5 text-[13px] font-semibold text-rose-400 transition-colors hover:bg-rose-500/[0.08]"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete Note
+                            </button>
+                            <button
+                                type="button"
+                                onClick={startEdit}
+                                className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
+                            >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit Note
+                            </button>
+                        </>
+                    )}
                 </motion.div>
             </div>
+
+            <ConfirmDialog
+                open={showDiscardConfirm}
+                title="Discard unsaved changes?"
+                description="You have unsaved edits to this note. Discarding will return to the original content."
+                confirmLabel="Discard changes"
+                cancelLabel="Keep editing"
+                destructive
+                onConfirm={exitEditMode}
+                onCancel={() => setShowDiscardConfirm(false)}
+            />
         </DashboardLayout>
     );
 }

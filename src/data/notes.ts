@@ -184,6 +184,50 @@ export function getRelatedMaterials(note: Note): NoteMaterial[] {
     }));
 }
 
+/**
+ * Flattens content blocks into plain text for the Edit Mode textarea. Intentionally
+ * lossy: Edit Mode is plain text only (no markdown editor per spec), so headings, lists,
+ * code, and quotes all collapse into blank-line-separated paragraphs. List items keep
+ * their "- " / "1. " markers as plain characters purely so the text still reads sensibly
+ * in the textarea — they are not parsed back into list blocks on save.
+ */
+export function noteContentToPlainText(blocks: NoteContentBlock[]): string {
+    return blocks
+        .map((block) => {
+            switch (block.kind) {
+                case "heading":
+                case "paragraph":
+                case "quote":
+                    return block.text;
+                case "bullet-list":
+                    return block.items.map((item) => `- ${item}`).join("\n");
+                case "numbered-list":
+                    return block.items.map((item, i) => `${i + 1}. ${item}`).join("\n");
+                case "code":
+                    return block.code;
+                default:
+                    return "";
+            }
+        })
+        .join("\n\n");
+}
+
+/**
+ * Converts edited plain text back into content blocks so View Mode can keep rendering
+ * through the existing NoteContentBlocks component unchanged. Blank lines separate
+ * paragraphs; every paragraph becomes a plain `paragraph` block since a plain textarea
+ * has no syntax to recover headings, lists, code, or quotes from. That loss of structure
+ * is the accepted trade-off of "simple textarea, no markdown editor" — a real editor
+ * would replace this conversion entirely rather than extend it.
+ */
+export function plainTextToNoteContent(text: string): NoteContentBlock[] {
+    return text
+        .split(/\n\s*\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+        .map((paragraph) => ({ kind: "paragraph", text: paragraph.replace(/\s*\n\s*/g, " ") }));
+}
+
 /** Timeline shown in the Recent Activity section. "favorited" only appears for notes
  *  currently favorited — mirrors how getCourseActivity conditionally omits entries. */
 export function getNoteActivity(note: Note): NoteActivityItem[] {
