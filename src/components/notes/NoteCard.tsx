@@ -19,9 +19,11 @@ const cardVariant = {
 
 export function NoteCard({ note, onToggleFavorite }: NoteCardProps) {
     return (
-        <motion.div
+        <motion.a
+            href={`#/dashboard/notes/${note.id}`}
             variants={cardVariant}
             whileHover={{ y: -4, transition: { duration: 0.25, ease: "easeOut" } }}
+            whileTap={{ scale: 0.98 }}
             className="group flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900 p-5 transition-colors duration-300 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/[0.04]"
         >
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -30,7 +32,13 @@ export function NoteCard({ note, onToggleFavorite }: NoteCardProps) {
                 </span>
                 <button
                     type="button"
-                    onClick={() => onToggleFavorite?.(note.id)}
+                    onClick={(e) => {
+                        // Stop this click from bubbling to the parent <a> and navigating away —
+                        // favoriting should happen in place, right from the Notes grid.
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onToggleFavorite?.(note.id);
+                    }}
                     aria-label={note.favorite ? "Remove from favorites" : "Add to favorites"}
                     aria-pressed={note.favorite}
                     className="flex-shrink-0 rounded-md p-0.5 transition-transform duration-200 hover:scale-110"
@@ -61,6 +69,6 @@ export function NoteCard({ note, onToggleFavorite }: NoteCardProps) {
             )}
 
             <p className="mt-auto text-[11px] text-text-muted">Edited {note.lastEdited}</p>
-        </motion.div>
+        </motion.a>
     );
 }

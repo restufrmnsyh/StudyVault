@@ -8,17 +8,11 @@ import {
     Clock,
     Download,
     Eye,
-    FileArchive,
-    FileImage,
     FilePlus,
-    FileSpreadsheet,
     FileText,
-    FileType2,
-    FileVideo,
     Layers,
     Pencil,
     PlayCircle,
-    Presentation,
     StickyNote,
     TrendingUp,
     Upload,
@@ -27,6 +21,7 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState } from "@/components/common";
+import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { courses, getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
 import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
@@ -49,26 +44,6 @@ const stagger = {
     visible: {
         transition: { staggerChildren: 0.08, delayChildren: 0.1 },
     },
-};
-
-const materialIcon: Record<CourseMaterial["type"], LucideIcon> = {
-    pdf: FileText,
-    ppt: Presentation,
-    doc: FileType2,
-    xls: FileSpreadsheet,
-    zip: FileArchive,
-    image: FileImage,
-    video: FileVideo,
-};
-
-const materialTypeLabel: Record<CourseMaterial["type"], string> = {
-    pdf: "PDF",
-    ppt: "PowerPoint",
-    doc: "Word",
-    xls: "Excel",
-    zip: "ZIP",
-    image: "Image",
-    video: "Video",
 };
 
 const actionButtonClass =

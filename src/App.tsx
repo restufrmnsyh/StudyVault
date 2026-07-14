@@ -4,6 +4,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { CoursesPage } from "@/pages/CoursesPage";
 import { CourseDetailPage } from "@/pages/CourseDetailPage";
 import { NotesPage } from "@/pages/NotesPage";
+import { NoteDetailPage } from "@/pages/NoteDetailPage";
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash);
@@ -29,6 +30,11 @@ export default function App() {
 
   if (hash.startsWith("#/dashboard/courses")) {
     return <CoursesPage />;
+  }
+
+  const noteDetailMatch = hash.match(/^#\/dashboard\/notes\/([^/]+)/);
+  if (noteDetailMatch) {
+    return <NoteDetailPage noteId={noteDetailMatch[1]} />;
   }
 
   if (hash.startsWith("#/dashboard/notes")) {
