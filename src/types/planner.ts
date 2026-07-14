@@ -16,3 +16,12 @@ export interface PlannerTask {
 }
 
 export type PlannerFilterKey = "all" | "today" | "upcoming" | "completed";
+
+/** Derived from a task's completed flag + due date, not stored — see getTaskStatus(). */
+export type TaskStatus = "completed" | "overdue" | "due-today" | "upcoming";
+
+export interface ChecklistItem {
+    id: string;
+    label: string;
+    done: boolean;
+}

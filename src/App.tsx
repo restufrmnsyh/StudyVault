@@ -6,6 +6,7 @@ import { CourseDetailPage } from "@/pages/CourseDetailPage";
 import { NotesPage } from "@/pages/NotesPage";
 import { NoteDetailPage } from "@/pages/NoteDetailPage";
 import { PlannerPage } from "@/pages/PlannerPage";
+import { TaskDetailPage } from "@/pages/TaskDetailPage";
 import { NotesProvider } from "@/context/NotesProvider";
 import { ToastProvider } from "@/context/ToastProvider";
 
@@ -42,6 +43,11 @@ function Router() {
 
   if (hash.startsWith("#/dashboard/notes")) {
     return <NotesPage />;
+  }
+
+  const taskDetailMatch = hash.match(/^#\/dashboard\/planner\/([^/]+)/);
+  if (taskDetailMatch) {
+    return <TaskDetailPage taskId={taskDetailMatch[1]} />;
   }
 
   if (hash.startsWith("#/dashboard/planner")) {

@@ -20,8 +20,8 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { SectionCard, ListRow, EmptyState, ConfirmDialog } from "@/components/common";
-import { NoteContentBlocks, RelatedCourseCard } from "@/components/notes";
+import { SectionCard, ListRow, EmptyState, ConfirmDialog, RelatedCourseCard } from "@/components/common";
+import { NoteContentBlocks } from "@/components/notes";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { getRelatedMaterials, getNoteActivity, noteContentToPlainText, plainTextToNoteContent } from "@/data/notes";
 import { courses } from "@/data/courses";

@@ -1,4 +1,4 @@
-import type { PlannerTask } from "@/types/planner";
+import type { ChecklistItem, PlannerTask, TaskStatus } from "@/types/planner";
 
 function toISODate(date: Date): string {
     return date.toISOString().slice(0, 10);
@@ -193,4 +193,47 @@ export function taskMatchesQuery(task: PlannerTask, query: string): boolean {
         task.description.toLowerCase().includes(q) ||
         task.courseCode.toLowerCase().includes(q)
     );
+}
+
+/** Derives a status label from completed + due date — nothing about status is stored directly. */
+export function getTaskStatus(task: PlannerTask): TaskStatus {
+    if (task.completed) return "completed";
+    if (task.dueDateISO < TODAY_ISO) return "overdue";
+    if (task.dueDateISO === TODAY_ISO) return "due-today";
+    return "upcoming";
+}
+
+/** "Today" / "Tomorrow" / "In 5 days" / "3 days ago", relative to the same `today` anchor
+ *  used to generate the dummy due dates above. */
+export function getRelativeDateLabel(dueDateISO: string): string {
+    const due = new Date(`${dueDateISO}T00:00:00`);
+    const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    if (diffDays === -1) return "Yesterday";
+    if (diffDays > 1) return `In ${diffDays} days`;
+    return `${Math.abs(diffDays)} days ago`;
+}
+
+/** One shared template, cycled by how far along the task's progress is — same approach
+ *  as getNoteContent in data/notes.ts: generic dummy content rather than unique per task,
+ *  since there's no real checklist authoring yet. */
+const checklistTemplates = [
+    "Review lecture notes and slides",
+    "Draft an initial outline or solution",
+    "Cross-check edge cases against course material",
+    "Proofread and finalize before submitting",
+];
+
+export function getTaskChecklist(task: PlannerTask): ChecklistItem[] {
+    const doneCount = task.completed
+        ? checklistTemplates.length
+        : Math.round((task.progress / 100) * checklistTemplates.length);
+
+    return checklistTemplates.map((label, i) => ({
+        id: `${task.id}-checklist-${i + 1}`,
+        label,
+        done: i < doneCount,
+    }));
 }

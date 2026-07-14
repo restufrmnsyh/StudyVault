@@ -23,7 +23,8 @@ const cardVariant = {
 
 export function TaskCard({ task, courseName, onToggleComplete }: TaskCardProps) {
     return (
-        <motion.div
+        <motion.a
+            href={`#/dashboard/planner/${task.id}`}
             variants={cardVariant}
             className={cn(
                 "flex items-start gap-3.5 rounded-2xl border border-zinc-800 bg-zinc-900 p-4 transition-colors duration-300 sm:items-center sm:gap-4 sm:p-5",
@@ -32,7 +33,13 @@ export function TaskCard({ task, courseName, onToggleComplete }: TaskCardProps) 
         >
             <button
                 type="button"
-                onClick={() => onToggleComplete(task.id)}
+                onClick={(e) => {
+                    // Stop this click from bubbling to the parent <a> and navigating away —
+                    // completing a task should happen in place, right from the task list.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToggleComplete(task.id);
+                }}
                 aria-label={task.completed ? `Mark "${task.title}" as not completed` : `Mark "${task.title}" as completed`}
                 aria-pressed={task.completed}
                 className={cn(
@@ -70,6 +77,6 @@ export function TaskCard({ task, courseName, onToggleComplete }: TaskCardProps) 
                     </span>
                 </div>
             </div>
-        </motion.div>
+        </motion.a>
     );
 }
