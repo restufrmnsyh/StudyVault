@@ -30,7 +30,7 @@ const pulseGlow = {
 
 export function Hero() {
   return (
-    <section className="relative flex min-h-[90dvh] items-center overflow-hidden">
+    <section className="relative flex min-h-screen items-center overflow-hidden">
       {/* Layered background effects */}
       <div className="pointer-events-none absolute inset-0">
         {/* Primary radial gradient — violet center bloom */}
@@ -91,7 +91,7 @@ export function Hero() {
 
       <Container>
         <motion.div
-          className="relative z-10 mx-auto flex max-w-3xl flex-col items-center py-32 text-center lg:py-40"
+          className="relative z-10 mx-auto flex max-w-3xl flex-col items-center py-24 text-center lg:-translate-y-10 lg:py-24"
           variants={stagger}
           initial="hidden"
           animate="visible"

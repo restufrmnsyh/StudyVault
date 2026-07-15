@@ -240,7 +240,34 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                             <button
                                 type="button"
                                 onClick={startEdit}
-                                className="absolute top-5 right-5 flex h-8 items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 text-[12px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400 sm:top-6 sm:right-6"
+                                className="
+        mt-4
+        flex
+        w-full
+        items-center
+        justify-center
+        gap-2
+        rounded-xl
+        border
+        border-white/[0.06]
+        bg-white/[0.02]
+        px-4
+        py-2.5
+        text-[13px]
+        font-medium
+        text-text-muted
+        transition-colors
+        hover:border-violet-500/30
+        hover:text-violet-400
+
+        lg:absolute
+        lg:top-6
+        lg:right-6
+        lg:mt-0
+        lg:w-auto
+        lg:px-3
+        lg:py-2
+"
                             >
                                 <Pencil className="h-3.5 w-3.5" />
                                 Edit Task

@@ -20,7 +20,7 @@ export function HowItWorks() {
     <Section id="how-it-works" className="relative">
       <Container>
         <motion.div
-          className="mx-auto mb-16 max-w-2xl text-center"
+          className="mx-auto mb-12 max-w-2xl text-center lg:mb-16"
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}
@@ -40,14 +40,14 @@ export function HowItWorks() {
           </motion.h2>
           <motion.p
             variants={fadeInUp}
-            className="text-lg text-text-secondary"
+            className="text-base text-text-secondary sm:text-lg"
           >
             {HOW_IT_WORKS.subtitle}
           </motion.p>
         </motion.div>
 
         <motion.div
-          className="relative grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-12"
+          className="relative grid grid-cols-1 gap-8 lg:grid-cols-3 lg:gap-8"
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-60px" }}
@@ -63,7 +63,7 @@ export function HowItWorks() {
               className="relative flex flex-col items-center text-center"
             >
               {/* Step number */}
-              <div className="relative z-10 mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gradient-from to-gradient-to text-xl font-bold text-white shadow-lg shadow-violet-500/20">
+              <div className="relative z-10 mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gradient-from to-gradient-to text-xl font-bold text-white shadow-lg shadow-violet-500/20">
                 {step.step}
               </div>
 
