@@ -8,6 +8,7 @@ import { NoteDetailPage } from "@/pages/NoteDetailPage";
 import { PlannerPage } from "@/pages/PlannerPage";
 import { TaskDetailPage } from "@/pages/TaskDetailPage";
 import { NotesProvider } from "@/context/NotesProvider";
+import { PlannerProvider } from "@/context/PlannerProvider";
 import { ToastProvider } from "@/context/ToastProvider";
 
 function useHashRoute() {
@@ -66,7 +67,9 @@ export default function App() {
   return (
     <ToastProvider>
       <NotesProvider>
-        <Router />
+        <PlannerProvider>
+          <Router />
+        </PlannerProvider>
       </NotesProvider>
     </ToastProvider>
   );

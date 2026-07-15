@@ -6,14 +6,18 @@ import {
     CalendarDays,
     CheckCircle2,
     ListTodo,
+    RotateCcw,
     Search as SearchIcon,
+    Zap,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { EmptyState, SearchInput, StatCard } from "@/components/common";
+import { EmptyState, SearchInput, StatCard, ConfirmDialog } from "@/components/common";
 import { PlannerFilterTabs, TaskCard } from "@/components/planner";
 import { courses } from "@/data/courses";
-import { TODAY_ISO, WEEK_END_ISO, taskMatchesQuery, tasks as initialTasks } from "@/data/planner";
-import type { PlannerFilterKey, PlannerTask } from "@/types/planner";
+import { TODAY_ISO, WEEK_END_ISO, taskMatchesQuery } from "@/data/planner";
+import { usePlanner } from "@/hooks/usePlanner";
+import { useToast } from "@/hooks/useToast";
+import type { PlannerFilterKey } from "@/types/planner";
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 16 },
@@ -32,16 +36,12 @@ const gridStagger = {
 };
 
 export function PlannerPage() {
-    // Local-only state for this sprint — checking a task off updates the UI but isn't
-    // persisted (no localStorage, no backend yet). Resets on reload, same as the dummy
-    // data it started from.
-    const [tasks, setTasks] = useState<PlannerTask[]>(initialTasks);
+    const { tasks, toggleComplete, resetDemoData } = usePlanner();
+    const { showToast } = useToast();
+
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<PlannerFilterKey>("all");
-
-    function toggleComplete(id: string) {
-        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
-    }
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
     const summary = useMemo(() => {
         const todaysTasks = tasks.filter((t) => t.dueDateISO === TODAY_ISO && !t.completed).length;
@@ -59,6 +59,8 @@ export function PlannerPage() {
             today: tasks.filter((t) => t.dueDateISO === TODAY_ISO).length,
             upcoming: tasks.filter((t) => !t.completed && t.dueDateISO > TODAY_ISO).length,
             completed: tasks.filter((t) => t.completed).length,
+            "high-priority": tasks.filter((t) => !t.completed && t.priority === "high").length,
+            overdue: tasks.filter((t) => !t.completed && t.dueDateISO < TODAY_ISO).length,
         }),
         [tasks],
     );
@@ -69,6 +71,8 @@ export function PlannerPage() {
         if (filter === "today") result = result.filter((t) => t.dueDateISO === TODAY_ISO);
         else if (filter === "upcoming") result = result.filter((t) => !t.completed && t.dueDateISO > TODAY_ISO);
         else if (filter === "completed") result = result.filter((t) => t.completed);
+        else if (filter === "high-priority") result = result.filter((t) => !t.completed && t.priority === "high");
+        else if (filter === "overdue") result = result.filter((t) => !t.completed && t.dueDateISO < TODAY_ISO);
 
         if (search.trim() !== "") {
             result = result.filter((t) => taskMatchesQuery(t, search));
@@ -82,7 +86,7 @@ export function PlannerPage() {
             return {
                 icon: SearchIcon,
                 title: "No tasks found",
-                description: "Try a different search term.",
+                description: "Try a different search term — search now also looks inside checklist items.",
             };
         }
         switch (filter) {
@@ -100,20 +104,53 @@ export function PlannerPage() {
                     title: "No completed tasks yet",
                     description: "Check off a task to see it here.",
                 };
+            case "high-priority":
+                return {
+                    icon: Zap,
+                    title: "No high priority tasks",
+                    description: "Tasks marked high priority will show up here.",
+                };
+            case "overdue":
+                return {
+                    icon: AlertCircle,
+                    title: "Nothing overdue",
+                    description: "You're all caught up — overdue tasks will show up here.",
+                };
             default:
                 return { icon: ListTodo, title: "No tasks yet", description: "Tasks you add will show up here." };
         }
     }, [search, filter]);
 
+    function handleResetConfirmed() {
+        resetDemoData();
+        setShowResetConfirm(false);
+        showToast("Planner reset");
+    }
+
     return (
         <DashboardLayout>
             <div className="space-y-6 lg:space-y-8">
                 {/* Header */}
-                <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-                    <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Planner</h1>
-                    <p className="mt-1.5 text-[15px] text-text-muted">
-                        Keep track of what's due across every course, in one place.
-                    </p>
+                <motion.div
+                    variants={fadeInUp}
+                    initial="hidden"
+                    animate="visible"
+                    className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                >
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">Planner</h1>
+                        <p className="mt-1.5 text-[15px] text-text-muted">
+                            Keep track of what's due across every course, in one place.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setShowResetConfirm(true)}
+                        className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                    >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Reset Demo Data</span>
+                    </button>
                 </motion.div>
 
                 {/* Summary cards */}
@@ -158,7 +195,7 @@ export function PlannerPage() {
                     <SearchInput
                         value={search}
                         onChange={setSearch}
-                        placeholder="Search tasks, descriptions, or courses..."
+                        placeholder="Search tasks, descriptions, courses, or checklist items..."
                         ariaLabel="Search tasks"
                     />
                 </motion.div>
@@ -186,6 +223,17 @@ export function PlannerPage() {
                     </div>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={showResetConfirm}
+                title="Reset planner to demo data?"
+                description="This clears any edits, checklist changes, or completions you've made and restores the original dummy tasks."
+                confirmLabel="Reset planner"
+                cancelLabel="Cancel"
+                destructive
+                onConfirm={handleResetConfirmed}
+                onCancel={() => setShowResetConfirm(false)}
+            />
         </DashboardLayout>
     );
 }

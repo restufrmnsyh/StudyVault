@@ -13,6 +13,8 @@ const tabs: Array<{ key: PlannerFilterKey; label: string }> = [
     { key: "today", label: "Today" },
     { key: "upcoming", label: "Upcoming" },
     { key: "completed", label: "Completed" },
+    { key: "high-priority", label: "High Priority" },
+    { key: "overdue", label: "Overdue" },
 ];
 
 export function PlannerFilterTabs({ activeFilter, onFilterChange, counts }: PlannerFilterTabsProps) {

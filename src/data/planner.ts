@@ -44,8 +44,32 @@ const in10 = relativeDate(10);
 const in14 = relativeDate(14);
 const past7 = relativeDate(-7);
 
+/** One shared template, cycled by how far along a task's progress is. Used only to seed
+ *  the dummy dataset below — once a task exists, its checklist lives on the task itself
+ *  and is edited directly (add/remove/rename), not regenerated from progress anymore. */
+const checklistTemplates = [
+    "Review lecture notes and slides",
+    "Draft an initial outline or solution",
+    "Cross-check edge cases against course material",
+    "Proofread and finalize before submitting",
+];
+
+function buildChecklist(taskId: string, progress: number, completed: boolean): ChecklistItem[] {
+    const doneCount = completed ? checklistTemplates.length : Math.round((progress / 100) * checklistTemplates.length);
+
+    return checklistTemplates.map((label, i) => ({
+        id: `${taskId}-checklist-${i + 1}`,
+        label,
+        done: i < doneCount,
+    }));
+}
+
+function task(input: Omit<PlannerTask, "checklist">): PlannerTask {
+    return { ...input, checklist: buildChecklist(input.id, input.progress, input.completed) };
+}
+
 export const tasks: PlannerTask[] = [
-    {
+    task({
         id: "1",
         title: "Submit BST Assignment",
         description: "Implement insertion, deletion, and in-order traversal with test cases.",
@@ -55,8 +79,8 @@ export const tasks: PlannerTask[] = [
         priority: "high",
         progress: 70,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "2",
         title: "Review Eigenvalue Problem Set",
         description: "Go through the practice problems before the next quiz.",
@@ -66,8 +90,8 @@ export const tasks: PlannerTask[] = [
         priority: "medium",
         progress: 40,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "3",
         title: "Backpropagation Lab Report",
         description: "Write up results from the 2-layer network gradient experiment.",
@@ -77,8 +101,8 @@ export const tasks: PlannerTask[] = [
         priority: "high",
         progress: 20,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "4",
         title: "SQL Optimization Exercise",
         description: "Rewrite the three slow queries from lecture using proper indexes.",
@@ -88,8 +112,8 @@ export const tasks: PlannerTask[] = [
         priority: "medium",
         progress: 0,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "5",
         title: "Graph Traversal Practice Set",
         description: "Solve the BFS/DFS problem set and time each approach.",
@@ -99,8 +123,8 @@ export const tasks: PlannerTask[] = [
         priority: "low",
         progress: 10,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "6",
         title: "Discrete Math Final Prep",
         description: "Condense lecture notes into a one-page cheat sheet.",
@@ -110,8 +134,8 @@ export const tasks: PlannerTask[] = [
         priority: "medium",
         progress: 55,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "7",
         title: "OS Scheduling Simulation",
         description: "Compare round robin vs priority scheduling on the sample workload.",
@@ -121,8 +145,8 @@ export const tasks: PlannerTask[] = [
         priority: "low",
         progress: 0,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "8",
         title: "Design Patterns Presentation",
         description: "Prepare slides covering three patterns used in the team project.",
@@ -132,8 +156,8 @@ export const tasks: PlannerTask[] = [
         priority: "low",
         progress: 5,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "9",
         title: "Probability Homework 4",
         description: "Problems covering binomial and Poisson distributions.",
@@ -143,8 +167,8 @@ export const tasks: PlannerTask[] = [
         priority: "high",
         progress: 60,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "10",
         title: "CS201 Reading Reflection",
         description: "Short reflection on the assigned tree-balancing paper.",
@@ -154,8 +178,8 @@ export const tasks: PlannerTask[] = [
         priority: "medium",
         progress: 30,
         completed: false,
-    },
-    {
+    }),
+    task({
         id: "11",
         title: "Neural Net Quiz Prep",
         description: "Review chain rule examples ahead of the quiz.",
@@ -165,8 +189,8 @@ export const tasks: PlannerTask[] = [
         priority: "medium",
         progress: 100,
         completed: true,
-    },
-    {
+    }),
+    task({
         id: "12",
         title: "SQL Indexing Worksheet",
         description: "Practice worksheet on composite index tradeoffs.",
@@ -176,8 +200,8 @@ export const tasks: PlannerTask[] = [
         priority: "low",
         progress: 100,
         completed: true,
-    },
-    {
+    }),
+    task({
         id: "13",
         title: "Eigenvector Warm-up Set",
         description: "Five short warm-up problems before the review session.",
@@ -187,9 +211,11 @@ export const tasks: PlannerTask[] = [
         priority: "low",
         progress: 100,
         completed: true,
-    },
+    }),
 ];
 
+/** Search now also looks inside checklist item labels, alongside title/description/course —
+ *  same shape as noteMatchesQuery in data/notes.ts, which searches note.content blocks too. */
 export function taskMatchesQuery(task: PlannerTask, query: string): boolean {
     const q = query.trim().toLowerCase();
     if (q === "") return true;
@@ -197,7 +223,8 @@ export function taskMatchesQuery(task: PlannerTask, query: string): boolean {
     return (
         task.title.toLowerCase().includes(q) ||
         task.description.toLowerCase().includes(q) ||
-        task.courseCode.toLowerCase().includes(q)
+        task.courseCode.toLowerCase().includes(q) ||
+        task.checklist.some((item) => item.label.toLowerCase().includes(q))
     );
 }
 
@@ -220,26 +247,4 @@ export function getRelativeDateLabel(dueDateISO: string): string {
     if (diffDays === -1) return "Yesterday";
     if (diffDays > 1) return `In ${diffDays} days`;
     return `${Math.abs(diffDays)} days ago`;
-}
-
-/** One shared template, cycled by how far along the task's progress is — same approach
- *  as getNoteContent in data/notes.ts: generic dummy content rather than unique per task,
- *  since there's no real checklist authoring yet. */
-const checklistTemplates = [
-    "Review lecture notes and slides",
-    "Draft an initial outline or solution",
-    "Cross-check edge cases against course material",
-    "Proofread and finalize before submitting",
-];
-
-export function getTaskChecklist(task: PlannerTask): ChecklistItem[] {
-    const doneCount = task.completed
-        ? checklistTemplates.length
-        : Math.round((task.progress / 100) * checklistTemplates.length);
-
-    return checklistTemplates.map((label, i) => ({
-        id: `${task.id}-checklist-${i + 1}`,
-        label,
-        done: i < doneCount,
-    }));
 }

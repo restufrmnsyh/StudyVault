@@ -4,13 +4,14 @@ import { AlignLeft, ArrowLeft, ListTodo, Pencil, Save, TrendingUp, X } from "luc
 import { DashboardLayout } from "@/components/dashboard";
 import { SectionCard, ProgressBar, ConfirmDialog } from "@/components/common";
 import { TaskDetailHeader, ChecklistSection, RelatedResources } from "@/components/planner";
-import { tasks, getTaskChecklist, formatDateFromISO } from "@/data/planner";
+import { formatDateFromISO } from "@/data/planner";
 import { courses } from "@/data/courses";
 import { notes } from "@/data/notes";
 import { priorityLabel, priorityStyle } from "@/constants/priority";
+import { usePlanner } from "@/hooks/usePlanner";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
-import type { ChecklistItem, PlannerTask } from "@/types/planner";
+import type { ChecklistItem } from "@/types/planner";
 import type { AssignmentPriority } from "@/types/courses";
 
 interface TaskDetailPageProps {
@@ -19,8 +20,8 @@ interface TaskDetailPageProps {
 
 type TaskDetailMode = "view" | "edit";
 
-/** Draft values bound to the Edit Mode form fields (everything except the checklist,
- *  which has its own draft — see `draftChecklist` below). */
+/** Draft values bound to the Edit Mode form fields, plus a separate checklist draft so
+ *  Cancel can revert structural edits (add/remove/rename) without touching the store. */
 interface TaskFieldsForm {
     title: string;
     description: string;
@@ -38,12 +39,12 @@ const fadeInUp = {
     },
 };
 
-/** Shared input/textarea chrome — matches the fields introduced in Note Edit Mode
- *  (Sprint 3.4C) rather than a new visual language for forms. */
+/** Shared input/textarea chrome — matches Note Edit Mode's fields rather than a new
+ *  visual language for forms. */
 const fieldClassName =
     "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-text-primary outline-none ring-violet-500/15 transition-all duration-200 placeholder:text-text-muted focus:border-violet-500/30 focus:bg-white/[0.04] focus:ring-4";
 
-function buildFormFromTask(task: PlannerTask): TaskFieldsForm {
+function buildFormFromTask(task: { title: string; description: string; dueDateISO: string; priority: AssignmentPriority; progress: number }): TaskFieldsForm {
     return {
         title: task.title,
         description: task.description,
@@ -58,16 +59,13 @@ function checklistEqual(a: ChecklistItem[], b: ChecklistItem[]): boolean {
 }
 
 export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
+    const { tasks, toggleChecklistItem, updateTask } = usePlanner();
     const { showToast } = useToast();
     const task = tasks.find((t) => t.id === taskId);
 
-    // Everything below is local component state only — per this sprint's scope, edits are
-    // NOT written back to data/planner.ts, a Context, or localStorage. `fieldsOverride`
-    // holds the last-saved edit (if any) so "Save updates current page state" holds true
-    // for the rest of this page's lifetime, without persisting anywhere else.
-    const [fieldsOverride, setFieldsOverride] = useState<TaskFieldsForm | null>(null);
-    const [checklist, setChecklist] = useState<ChecklistItem[]>(() => (task ? getTaskChecklist(task) : []));
-
+    // Edit Mode state only — the committed task now lives in PlannerContext (backed by
+    // localStorage), so Planner Overview stays in sync the instant Save is pressed. This
+    // mirrors NoteDetailPage's `form` + `useNotes()` split from the Notes module.
     const [mode, setMode] = useState<TaskDetailMode>("view");
     const [form, setForm] = useState<TaskFieldsForm | null>(null);
     const [draftChecklist, setDraftChecklist] = useState<ChecklistItem[] | null>(null);
@@ -90,33 +88,22 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
         );
     }
 
-    const currentFields = fieldsOverride ?? buildFormFromTask(task);
-    const displayTask: PlannerTask = {
-        ...task,
-        title: currentFields.title,
-        description: currentFields.description,
-        dueDateISO: currentFields.dueDateISO,
-        dueDate: formatDateFromISO(currentFields.dueDateISO),
-        priority: currentFields.priority,
-        progress: currentFields.progress,
-    };
-
     const isEditing = mode === "edit" && form !== null && draftChecklist !== null;
 
     const isDirty =
         isEditing &&
         form !== null &&
         draftChecklist !== null &&
-        (form.title.trim() !== currentFields.title ||
-            form.description.trim() !== currentFields.description ||
-            form.dueDateISO !== currentFields.dueDateISO ||
-            form.priority !== currentFields.priority ||
-            form.progress !== currentFields.progress ||
-            !checklistEqual(draftChecklist, checklist));
+        (form.title.trim() !== task.title ||
+            form.description.trim() !== task.description ||
+            form.dueDateISO !== task.dueDateISO ||
+            form.priority !== task.priority ||
+            form.progress !== task.progress ||
+            !checklistEqual(draftChecklist, task.checklist));
 
     function startEdit() {
-        setForm(buildFormFromTask(displayTask));
-        setDraftChecklist([...checklist]);
+        setForm(buildFormFromTask(task!));
+        setDraftChecklist([...task!.checklist]);
         setMode("edit");
     }
 
@@ -137,19 +124,26 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
     function handleSave() {
         if (!form || !draftChecklist || form.title.trim() === "") return;
-        setFieldsOverride({ ...form, title: form.title.trim(), description: form.description.trim() });
-        setChecklist(draftChecklist);
+        updateTask(task!.id, {
+            title: form.title.trim(),
+            description: form.description.trim(),
+            dueDateISO: form.dueDateISO,
+            dueDate: formatDateFromISO(form.dueDateISO),
+            priority: form.priority,
+            progress: form.progress,
+            checklist: draftChecklist,
+        });
         exitEditMode();
-        showToast("Task updated locally");
+        showToast("Task saved locally");
     }
 
-    // View-mode checklist toggle mutates `checklist` directly (unchanged since Sprint
-    // 3.5B). Edit-mode toggle mutates the draft instead, so Cancel can still revert it.
-    function toggleChecklistItem(id: string) {
+    // View-mode checklist toggle dispatches straight to PlannerContext (synced + persisted
+    // immediately). Edit-mode toggle mutates the local draft instead, so Cancel can revert it.
+    function toggleChecklistItemHandler(id: string) {
         if (isEditing && draftChecklist) {
             setDraftChecklist((prev) => prev!.map((item) => (item.id === id ? { ...item, done: !item.done } : item)));
         } else {
-            setChecklist((prev) => prev.map((item) => (item.id === id ? { ...item, done: !item.done } : item)));
+            toggleChecklistItem(task!.id, id);
         }
     }
 
@@ -159,7 +153,7 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
     function addChecklistItem(label: string) {
         setDraftChecklist((prev) =>
-            prev ? [...prev, { id: `${displayTask.id}-checklist-new-${Date.now()}`, label, done: false }] : prev,
+            prev ? [...prev, { id: `${task!.id}-checklist-new-${Date.now()}`, label, done: false }] : prev,
         );
     }
 
@@ -242,7 +236,7 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                         </div>
                     ) : (
                         <>
-                            <TaskDetailHeader task={displayTask} courseName={relatedCourse?.name} />
+                            <TaskDetailHeader task={task} courseName={relatedCourse?.name} />
                             <button
                                 type="button"
                                 onClick={startEdit}
@@ -274,7 +268,7 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                                     />
                                 </>
                             ) : (
-                                <p className="text-[14px] leading-relaxed text-text-secondary">{displayTask.description}</p>
+                                <p className="text-[14px] leading-relaxed text-text-secondary">{task.description}</p>
                             )}
                         </div>
                     </SectionCard>
@@ -306,9 +300,9 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                                 </>
                             ) : (
                                 <div className="flex items-center gap-3">
-                                    <ProgressBar progress={displayTask.progress} className="flex-1" />
+                                    <ProgressBar progress={task.progress} className="flex-1" />
                                     <span className="w-10 flex-shrink-0 text-right text-[13px] font-semibold tabular-nums text-text-primary">
-                                        {displayTask.progress}%
+                                        {task.progress}%
                                     </span>
                                 </div>
                             )}
@@ -319,8 +313,8 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                 {/* Checklist */}
                 <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.15 }}>
                     <ChecklistSection
-                        items={isEditing && draftChecklist ? draftChecklist : checklist}
-                        onToggle={toggleChecklistItem}
+                        items={isEditing && draftChecklist ? draftChecklist : task.checklist}
+                        onToggle={toggleChecklistItemHandler}
                         editable={isEditing}
                         onRename={renameChecklistItem}
                         onAdd={addChecklistItem}
