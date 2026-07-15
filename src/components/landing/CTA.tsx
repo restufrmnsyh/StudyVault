@@ -73,7 +73,7 @@ export function CTA() {
             </motion.p>
             <motion.div variants={fadeInUp}>
               <a
-                href="#"
+                href="#/login"
                 className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-xl px-8 py-3.5 text-[15px] font-semibold text-white transition-all duration-300 hover:scale-[1.03]"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500" />

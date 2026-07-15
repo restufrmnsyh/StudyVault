@@ -7,9 +7,14 @@ import { NotesPage } from "@/pages/NotesPage";
 import { NoteDetailPage } from "@/pages/NoteDetailPage";
 import { PlannerPage } from "@/pages/PlannerPage";
 import { TaskDetailPage } from "@/pages/TaskDetailPage";
+import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
 import { NotesProvider } from "@/context/NotesProvider";
 import { PlannerProvider } from "@/context/PlannerProvider";
 import { ToastProvider } from "@/context/ToastProvider";
+import { AuthProvider } from "@/auth/AuthProvider";
+import { ProtectedRoute, GuestOnlyRoute } from "@/auth/ProtectedRoute";
 
 function useHashRoute() {
   const [hash, setHash] = useState(window.location.hash);
@@ -28,49 +33,107 @@ function useHashRoute() {
 function Router() {
   const hash = useHashRoute();
 
+  // Public auth routes
+  if (hash.startsWith("#/login")) {
+    return (
+      <GuestOnlyRoute>
+        <LoginPage />
+      </GuestOnlyRoute>
+    );
+  }
+
+  if (hash.startsWith("#/register")) {
+    return (
+      <GuestOnlyRoute>
+        <RegisterPage />
+      </GuestOnlyRoute>
+    );
+  }
+
+  if (hash.startsWith("#/forgot-password")) {
+    // Intentionally not a GuestOnlyRoute: spec lists this as public regardless of auth
+    // state (only /login and /register redirect an already-signed-in user away).
+    return <ForgotPasswordPage />;
+  }
+
+  // Protected app routes
   const courseDetailMatch = hash.match(/^#\/dashboard\/courses\/([^/]+)/);
   if (courseDetailMatch) {
-    return <CourseDetailPage courseId={courseDetailMatch[1]} />;
+    return (
+      <ProtectedRoute>
+        <CourseDetailPage courseId={courseDetailMatch[1]} />
+      </ProtectedRoute>
+    );
   }
 
   if (hash.startsWith("#/dashboard/courses")) {
-    return <CoursesPage />;
+    return (
+      <ProtectedRoute>
+        <CoursesPage />
+      </ProtectedRoute>
+    );
   }
 
   const noteDetailMatch = hash.match(/^#\/dashboard\/notes\/([^/]+)/);
   if (noteDetailMatch) {
-    return <NoteDetailPage noteId={noteDetailMatch[1]} />;
+    return (
+      <ProtectedRoute>
+        <NoteDetailPage noteId={noteDetailMatch[1]} />
+      </ProtectedRoute>
+    );
   }
 
   if (hash.startsWith("#/dashboard/notes")) {
-    return <NotesPage />;
+    return (
+      <ProtectedRoute>
+        <NotesPage />
+      </ProtectedRoute>
+    );
   }
 
   const taskDetailMatch = hash.match(/^#\/dashboard\/planner\/([^/]+)/);
   if (taskDetailMatch) {
-    return <TaskDetailPage taskId={taskDetailMatch[1]} />;
+    return (
+      <ProtectedRoute>
+        <TaskDetailPage taskId={taskDetailMatch[1]} />
+      </ProtectedRoute>
+    );
   }
 
   if (hash.startsWith("#/dashboard/planner")) {
-    return <PlannerPage />;
+    return (
+      <ProtectedRoute>
+        <PlannerPage />
+      </ProtectedRoute>
+    );
   }
 
   // Any other hash starting with #/dashboard renders the dashboard overview
+  // (this also covers #/dashboard/settings — there's no Settings page yet, so it falls
+  // through to the overview once authenticated, same as it did before this sprint).
   if (hash.startsWith("#/dashboard")) {
-    return <DashboardPage />;
+    return (
+      <ProtectedRoute>
+        <DashboardPage />
+      </ProtectedRoute>
+    );
   }
 
   return <LandingPage />;
 }
 
 export default function App() {
+  // AuthProvider sits outermost — routing and every guard below it reads auth state,
+  // and it has no dependency on the other providers.
   return (
-    <ToastProvider>
-      <NotesProvider>
-        <PlannerProvider>
-          <Router />
-        </PlannerProvider>
-      </NotesProvider>
-    </ToastProvider>
+    <AuthProvider>
+      <ToastProvider>
+        <NotesProvider>
+          <PlannerProvider>
+            <Router />
+          </PlannerProvider>
+        </NotesProvider>
+      </ToastProvider>
+    </AuthProvider>
   );
 }
