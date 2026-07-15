@@ -8,6 +8,12 @@ function formatDisplayDate(date: Date): string {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** Public counterpart to the private formatter above — used by Task Edit Mode to turn the
+ *  `<input type="date">` value back into the same display format the dummy data uses. */
+export function formatDateFromISO(iso: string): string {
+    return formatDisplayDate(new Date(`${iso}T00:00:00`));
+}
+
 function addDays(base: Date, days: number): Date {
     const next = new Date(base);
     next.setDate(next.getDate() + days);
