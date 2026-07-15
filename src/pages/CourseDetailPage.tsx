@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import {
+    AlertTriangle,
     ArrowLeft,
     BarChart3,
     BookOpen,
@@ -11,6 +12,7 @@ import {
     FilePlus,
     FileText,
     Layers,
+    Loader2,
     Pencil,
     PlayCircle,
     StickyNote,
@@ -23,7 +25,8 @@ import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState } from "@/components/common";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
-import { courses, getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
+import { getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
+import { useCourse } from "@/hooks/queries/useCourse";
 import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
 
@@ -140,7 +143,37 @@ function QuickActionButton({ icon: Icon, label, color }: QuickAction) {
 }
 
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
-    const course = courses.find((c) => c.id === courseId);
+    const { data: course, loading, error, refresh } = useCourse(courseId);
+
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-800 py-20 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+                    <p className="text-[14px] font-medium text-text-primary">Loading course…</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-rose-500/20 py-20 text-center">
+                    <AlertTriangle className="h-8 w-8 text-rose-400" />
+                    <p className="text-[14px] font-medium text-text-primary">Couldn't load this course</p>
+                    <p className="max-w-sm text-[13px] text-text-muted">{error}</p>
+                    <button
+                        type="button"
+                        onClick={() => void refresh()}
+                        className="mt-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                    >
+                        Try again
+                    </button>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     if (!course) {
         return (
