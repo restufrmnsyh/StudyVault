@@ -117,3 +117,59 @@ export async function getCourseById(id: string): Promise<CourseRecord | null> {
 
     return data ? mapCourse(data) : null;
 }
+
+export interface CreateCourseInput {
+    name: string;
+    code: string;
+    /** Empty string is treated as "not set" and stored as null, same as the DB column. */
+    lecturer: string;
+    semester: number;
+    description: string;
+    /** Omit (or empty string) to fall back to DEFAULT_COURSE_COLOR via toCourse(). */
+    color: string;
+}
+
+/**
+ * Creates a course owned by the signed-in user.
+ *
+ * `user_id` is set explicitly from the current session rather than relying on a
+ * column default — `courses_insert_own` (RLS) requires `user_id = auth.uid()` in its
+ * WITH CHECK clause, so the row is rejected outright if this is wrong or missing.
+ */
+export async function createCourse(input: CreateCourseInput): Promise<CourseRecord> {
+    const {
+        data: { user },
+        error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+        throw new Error(authError.message);
+    }
+    if (!user) {
+        throw new Error("You need to be signed in to create a course.");
+    }
+
+    const { data, error } = await supabase
+        .from("courses")
+        .insert({
+            user_id: user.id,
+            code: input.code,
+            name: input.name,
+            lecturer: input.lecturer || null,
+            semester: input.semester,
+            description: input.description || null,
+            color: input.color || null,
+        })
+        .select()
+        .single<CourseRow>();
+
+    if (error) {
+        // 23505 = unique_violation — courses_user_id_code_key (migration.sql 2.2).
+        if (error.code === "23505") {
+            throw new Error(`You already have a course with the code "${input.code}".`);
+        }
+        throw new Error(error.message);
+    }
+
+    return mapCourse(data);
+}

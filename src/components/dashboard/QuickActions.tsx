@@ -31,12 +31,12 @@ const cardVariant = {
 };
 
 /**
- * Entry points only — every card is intentionally non-interactive this sprint (no href,
- * no onClick), including "Open Planner" even though that route already exists. Kept
- * uniform across all four rather than special-casing one, since the sprint scope is the
- * layout/UI, not wiring behavior yet.
+ * Entry points only. "Create Course" is wired to open CreateCourseModal (Sprint 4.4);
+ * the other three stay intentionally non-interactive (no href, no onClick) — including
+ * "Open Planner" even though that route already exists — since this sprint's scope is
+ * just the one feature, not wiring every quick action.
  */
-export function QuickActions() {
+export function QuickActions({ onCreateCourse }: { onCreateCourse: () => void }) {
     return (
         <motion.div
             className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
@@ -48,6 +48,7 @@ export function QuickActions() {
                 <motion.button
                     key={action.label}
                     type="button"
+                    onClick={action.label === "Create Course" ? onCreateCourse : undefined}
                     variants={cardVariant}
                     whileHover={{ y: -3, transition: { duration: 0.2, ease: "easeOut" } }}
                     whileTap={{ scale: 0.98 }}

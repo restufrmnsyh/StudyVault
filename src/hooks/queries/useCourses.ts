@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getCourses, toCourse } from "@/services/course.service";
+import { getCourses, createCourse as createCourseService, toCourse, type CreateCourseInput } from "@/services/course.service";
 import type { Course } from "@/types/courses";
 
 export interface UseCoursesResult {
@@ -7,6 +7,12 @@ export interface UseCoursesResult {
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
+    /** Creates a course via course.service.ts, then appends it to `data` (re-sorted by
+     *  code, matching getCourses()'s own ordering) — no extra round-trip refetch needed.
+     *  Throws on failure so the caller (the Create Course modal) can show its own error
+     *  state; this hook doesn't swallow it into `error` above, since that's reserved for
+     *  the list fetch. */
+    createCourse: (input: CreateCourseInput) => Promise<Course>;
 }
 
 /** Loads every course owned by the signed-in user, adapted to the frontend Course model
@@ -54,5 +60,12 @@ export function useCourses(): UseCoursesResult {
         };
     }, []);
 
-    return { data, loading, error, refresh };
+    const createCourse = useCallback(async (input: CreateCourseInput): Promise<Course> => {
+        const record = await createCourseService(input);
+        const course = toCourse(record);
+        setData((prev) => [...prev, course].sort((a, b) => a.code.localeCompare(b.code)));
+        return course;
+    }, []);
+
+    return { data, loading, error, refresh, createCourse };
 }

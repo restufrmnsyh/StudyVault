@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import { FolderPlus, StickyNote } from "lucide-react";
 import { currentUser } from "@/data/dashboard";
-import { useCourses } from "@/hooks/queries/useCourses";
 import { useNotes } from "@/hooks/useNotes";
 import { usePlanner } from "@/hooks/usePlanner";
+import type { Course } from "@/types/courses";
 
 function getGreeting(): string {
     const hour = new Date().getHours();
@@ -34,11 +34,19 @@ function HeroStat({ label, value }: { label: string; value: string }) {
     );
 }
 
-export function Hero() {
-    // Courses is already live on Supabase (Sprint 4.3) — Notes/Planner aren't migrated
-    // yet, so their counts come from the same local stores their own pages read, to stay
-    // consistent with what the user actually sees on those pages right now.
-    const { data: courses, loading: coursesLoading } = useCourses();
+interface HeroProps {
+    /** Passed down from DashboardPage rather than calling useCourses() here directly —
+     *  DashboardPage owns the one instance this stat and the Create Course modal both
+     *  need to share, so creating a course updates this count live. */
+    courses: Course[];
+    coursesLoading: boolean;
+    onCreateCourse: () => void;
+}
+
+export function Hero({ courses, coursesLoading, onCreateCourse }: HeroProps) {
+    // Notes/Planner aren't migrated to Supabase yet, so their counts come from the same
+    // local stores their own pages read, to stay consistent with what the user actually
+    // sees on those pages right now.
     const { notes } = useNotes();
     const { tasks } = usePlanner();
 
@@ -74,6 +82,7 @@ export function Hero() {
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                     <button
                         type="button"
+                        onClick={onCreateCourse}
                         className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
                     >
                         <FolderPlus className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5" />
