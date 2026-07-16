@@ -25,12 +25,16 @@ export function ContinueLearning() {
       variants={fadeInUp}
       initial="hidden"
       animate="visible"
-      className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900"
+      className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900"
     >
-      <div className="p-5 sm:p-6">
-        <div className="mb-4 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-text-muted">
-          <BookOpen className="h-3.5 w-3.5" />
-          Continue Learning
+      <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-violet-500/[0.06] blur-3xl" />
+
+      <div className="relative p-5 sm:p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-500 to-indigo-500">
+            <BookOpen className="h-3.5 w-3.5 text-white" />
+          </div>
+          <span className="text-[12px] font-medium tracking-wide text-text-muted uppercase">Continue Learning</span>
         </div>
 
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

@@ -1,19 +1,25 @@
 import {
   DashboardLayout,
-  Greeting,
-  OverviewCards,
+  Hero,
+  QuickActions,
+  TodaysFocus,
   ContinueLearning,
-  RecentNotes,
+  UpcomingDeadlines,
+  RecentActivity,
+  OverviewCards,
 } from "@/components/dashboard";
 
 export function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 lg:space-y-8">
-        <Greeting />
-        <OverviewCards />
+        <Hero />
+        <QuickActions />
+        <TodaysFocus />
         <ContinueLearning />
-        <RecentNotes />
+        <UpcomingDeadlines />
+        <RecentActivity />
+        <OverviewCards />
       </div>
     </DashboardLayout>
   );
