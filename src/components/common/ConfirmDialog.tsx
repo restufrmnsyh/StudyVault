@@ -12,6 +12,11 @@ interface ConfirmDialogProps {
     /** Red confirm button for destructive actions (delete, discard). Defaults to true
      *  since that's the more common case for this dialog today. */
     destructive?: boolean;
+    /** Shows a small spinner in the confirm button and disables both buttons (and the
+     *  backdrop-click-to-close) — for an in-flight async action triggered by onConfirm,
+     *  e.g. a delete request. Optional, defaults to false, so every existing call site
+     *  (discard-changes prompts, etc.) renders exactly as it did before. */
+    loading?: boolean;
     onConfirm: () => void;
     onCancel: () => void;
 }
@@ -30,6 +35,7 @@ export function ConfirmDialog({
     confirmLabel = "Confirm",
     cancelLabel = "Cancel",
     destructive = true,
+    loading = false,
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
@@ -42,7 +48,7 @@ export function ConfirmDialog({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        onClick={onCancel}
+                        onClick={loading ? undefined : onCancel}
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                     />
                     <motion.div
@@ -79,20 +85,25 @@ export function ConfirmDialog({
                             <button
                                 type="button"
                                 onClick={onCancel}
-                                className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[13px] font-medium text-text-secondary transition-colors hover:bg-white/[0.05] hover:text-text-primary"
+                                disabled={loading}
+                                className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[13px] font-medium text-text-secondary transition-colors hover:bg-white/[0.05] hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {cancelLabel}
                             </button>
                             <button
                                 type="button"
                                 onClick={onConfirm}
+                                disabled={loading}
                                 className={cn(
-                                    "rounded-xl px-4 py-2 text-[13px] font-semibold text-white transition-colors",
+                                    "flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                                     destructive
                                         ? "bg-rose-500/90 hover:bg-rose-500"
                                         : "bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 hover:shadow-lg hover:shadow-violet-500/20",
                                 )}
                             >
+                                {loading && (
+                                    <span className="h-3.5 w-3.5 flex-shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                )}
                                 {confirmLabel}
                             </button>
                         </div>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
     AlertTriangle,
@@ -17,16 +18,19 @@ import {
     PlayCircle,
     StickyNote,
     TrendingUp,
+    Trash2,
     Upload,
     Zap,
     type LucideIcon,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState } from "@/components/common";
+import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState, ConfirmDialog } from "@/components/common";
+import { EditCourseModal } from "@/components/courses";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
 import { getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
 import { useCourse } from "@/hooks/queries/useCourse";
+import { useToast } from "@/hooks/useToast";
 import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
 
@@ -143,7 +147,23 @@ function QuickActionButton({ icon: Icon, label, color }: QuickAction) {
 }
 
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
-    const { data: course, loading, error, refresh } = useCourse(courseId);
+    const { data: course, loading, error, refresh, updateCourse, deleteCourse } = useCourse(courseId);
+    const { showToast } = useToast();
+    const [editOpen, setEditOpen] = useState(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    async function handleDeleteConfirmed() {
+        setDeleting(true);
+        try {
+            await deleteCourse();
+            showToast("Course deleted successfully", "success");
+            window.location.hash = "#/dashboard/courses";
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to delete course", "error");
+            setDeleting(false);
+        }
+    }
 
     if (loading) {
         return (
@@ -237,6 +257,20 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                             <p className="mt-4 text-[14px] leading-relaxed text-text-secondary">
                                 {course.description}
                             </p>
+                        </div>
+                        <div className="flex flex-shrink-0 items-center gap-2">
+                            <button type="button" onClick={() => setEditOpen(true)} className={actionButtonClass}>
+                                <Pencil className="h-3 w-3" />
+                                <span className="hidden sm:inline">Edit</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDeleteConfirmOpen(true)}
+                                className="flex h-7 items-center gap-1 rounded-md border border-rose-500/20 bg-rose-500/[0.03] px-2 text-[11px] font-medium text-rose-400 transition-colors hover:bg-rose-500/[0.08]"
+                            >
+                                <Trash2 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Delete</span>
+                            </button>
                         </div>
                     </div>
                 </motion.div>
@@ -410,6 +444,20 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     </SectionCard>
                 </motion.div>
             </div>
+
+            <EditCourseModal open={editOpen} course={course} onClose={() => setEditOpen(false)} onUpdate={updateCourse} />
+
+            <ConfirmDialog
+                open={deleteConfirmOpen}
+                title={`Delete "${course.name}"?`}
+                description="This action cannot be undone."
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                destructive
+                loading={deleting}
+                onConfirm={handleDeleteConfirmed}
+                onCancel={() => setDeleteConfirmOpen(false)}
+            />
         </DashboardLayout>
     );
 }

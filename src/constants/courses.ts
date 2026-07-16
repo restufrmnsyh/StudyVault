@@ -1,10 +1,9 @@
-/** Fixed dropdown options for the Courses semester filter — UI chrome, not course
- *  row data, so it lives here rather than in a per-record data or service file. */
-export const semesters: string[] = ["All Semesters", "Semester 1", "Semester 2", "Semester 3", "Semester 4"];
+export const semesterOptions = [1, 2, 3, 4, 5, 6, 7, 8];
 
-/** Numeric options for the Create Course form's semester field — matches the `smallint`
- *  column in migration.sql (no CHECK constraint, but the app only ever shows 1–8). */
-export const semesterOptions: number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export const semesters = [
+    "All Semesters",
+    ...semesterOptions.map((n) => `Semester ${n}`),
+];
 
 /** Accent color choices for the Create Course form — the exact same gradients
  *  data/courses.ts's dummy fixtures already use, so a newly created course fits the

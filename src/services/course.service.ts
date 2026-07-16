@@ -118,6 +118,59 @@ export async function getCourseById(id: string): Promise<CourseRecord | null> {
     return data ? mapCourse(data) : null;
 }
 
+export interface UpdateCourseInput {
+    name: string;
+    code: string;
+    lecturer: string;
+    semester: number;
+    description: string;
+    color: string;
+}
+
+/**
+ * Updates a course owned by the signed-in user. No client-side auth check like
+ * createCourse() needs — `user_id` isn't part of the update payload (it never changes),
+ * and `courses_update_own` (RLS) already scopes the row itself to `auth.uid()`.
+ */
+export async function updateCourse(id: string, input: UpdateCourseInput): Promise<CourseRecord> {
+    const { data, error } = await supabase
+        .from("courses")
+        .update({
+            code: input.code,
+            name: input.name,
+            lecturer: input.lecturer || null,
+            semester: input.semester,
+            description: input.description || null,
+            color: input.color || null,
+        })
+        .eq("id", id)
+        .select()
+        .single<CourseRow>();
+
+    if (error) {
+        // 23505 = unique_violation — courses_user_id_code_key (migration.sql 2.2).
+        if (error.code === "23505") {
+            throw new Error(`You already have a course with the code "${input.code}".`);
+        }
+        throw new Error(error.message);
+    }
+
+    return mapCourse(data);
+}
+
+/**
+ * Deletes a course owned by the signed-in user. `courses_delete_own` (RLS) scopes this
+ * to rows where `user_id = auth.uid()`; ON DELETE CASCADE (migration.sql 2.3/2.4) takes
+ * care of the course's notes and planner_tasks — nothing else to clean up client-side.
+ */
+export async function deleteCourse(id: string): Promise<void> {
+    const { error } = await supabase.from("courses").delete().eq("id", id);
+
+    if (error) {
+        throw new Error(error.message);
+    }
+}
+
 export interface CreateCourseInput {
     name: string;
     code: string;

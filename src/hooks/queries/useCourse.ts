@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { getCourseById, toCourse } from "@/services/course.service";
+import {
+    getCourseById,
+    toCourse,
+    updateCourse as updateCourseService,
+    deleteCourse as deleteCourseService,
+    type UpdateCourseInput,
+} from "@/services/course.service";
 import type { Course } from "@/types/courses";
 
 export interface UseCourseResult {
@@ -10,6 +16,14 @@ export interface UseCourseResult {
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
+    /** Updates the course via course.service.ts, then replaces `data` with the fresh
+     *  record — no extra round-trip refetch needed. Throws on failure so the caller
+     *  (Edit Course modal) can show its own error state. */
+    updateCourse: (input: UpdateCourseInput) => Promise<Course>;
+    /** Deletes the course via course.service.ts. Doesn't touch `data` on success — the
+     *  caller (Course Detail page) navigates away immediately, so there's no
+     *  "deleted but still displayed" state to reconcile here. */
+    deleteCourse: () => Promise<void>;
 }
 
 /** Loads a single course by id for Course Detail. Separate from useCourses() (the list
@@ -62,5 +76,19 @@ export function useCourse(id: string): UseCourseResult {
         };
     }, [id]);
 
-    return { data, loading, error, refresh };
+    const updateCourse = useCallback(
+        async (input: UpdateCourseInput): Promise<Course> => {
+            const record = await updateCourseService(id, input);
+            const course = toCourse(record);
+            setData(course);
+            return course;
+        },
+        [id],
+    );
+
+    const deleteCourse = useCallback(async (): Promise<void> => {
+        await deleteCourseService(id);
+    }, [id]);
+
+    return { data, loading, error, refresh, updateCourse, deleteCourse };
 }
