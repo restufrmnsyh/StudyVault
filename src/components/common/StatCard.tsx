@@ -25,6 +25,12 @@ interface StatCardProps {
      * Defaults to false so existing call sites (e.g. the Dashboard) are unaffected.
      */
     compactOnMobile?: boolean;
+    /**
+     * Uniformly smaller at every breakpoint (not just mobile) — for dense grids like the
+     * redesigned Dashboard's Statistics section. Takes priority over `compactOnMobile`
+     * if both are set. Defaults to false.
+     */
+    compact?: boolean;
 }
 
 export function StatCard({
@@ -34,6 +40,7 @@ export function StatCard({
     color,
     trend,
     compactOnMobile = false,
+    compact = false,
 }: StatCardProps) {
     return (
         <motion.div
@@ -42,20 +49,20 @@ export function StatCard({
             whileTap={{ scale: 0.98 }}
             className={cn(
                 "group rounded-2xl border border-zinc-800 bg-zinc-900 transition-colors duration-300 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/[0.04]",
-                compactOnMobile ? "p-3 sm:p-5" : "p-5",
+                compact ? "p-3.5" : compactOnMobile ? "p-3 sm:p-5" : "p-5",
             )}
         >
             <div
                 className={cn(
                     "flex items-center justify-between",
-                    compactOnMobile ? "mb-2 sm:mb-4" : "mb-4",
+                    compact ? "mb-2.5" : compactOnMobile ? "mb-2 sm:mb-4" : "mb-4",
                 )}
             >
                 <div
                     className={cn(
                         "flex items-center justify-center rounded-xl bg-gradient-to-br shadow-sm transition-transform duration-300 group-hover:scale-105",
                         color,
-                        compactOnMobile ? "h-8 w-8 sm:h-9 sm:w-9" : "h-9 w-9",
+                        compact ? "h-8 w-8" : compactOnMobile ? "h-8 w-8 sm:h-9 sm:w-9" : "h-9 w-9",
                     )}
                 >
                     <Icon className="h-4 w-4 text-white" />
@@ -69,7 +76,7 @@ export function StatCard({
             <p
                 className={cn(
                     "font-bold tabular-nums text-text-primary",
-                    compactOnMobile ? "text-xl sm:text-2xl" : "text-2xl",
+                    compact ? "text-lg" : compactOnMobile ? "text-xl sm:text-2xl" : "text-2xl",
                 )}
             >
                 {value}
@@ -77,7 +84,7 @@ export function StatCard({
             <p
                 className={cn(
                     "text-text-muted",
-                    compactOnMobile ? "mt-0.5 text-[12px] sm:mt-1 sm:text-[13px]" : "mt-1 text-[13px]",
+                    compact ? "mt-0.5 text-[11px]" : compactOnMobile ? "mt-0.5 text-[12px] sm:mt-1 sm:text-[13px]" : "mt-1 text-[13px]",
                 )}
             >
                 {label}

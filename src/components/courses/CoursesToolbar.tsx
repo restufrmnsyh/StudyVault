@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { SearchInput } from "@/components/common";
-import { semesters } from "@/data/courses";
+import { semesters } from "@/constants/courses";
 
 interface CoursesToolbarProps {
     searchValue: string;

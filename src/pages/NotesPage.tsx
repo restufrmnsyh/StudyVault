@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Archive, Clock, FileText, Plus, RotateCcw, Search as SearchIcon, Star } from "lucide-react";
+import { Archive, Clock, FileText, Plus, Search as SearchIcon, Star, Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { SearchInput, EmptyState, ConfirmDialog } from "@/components/common";
-import { NoteCard, NotesFilterSidebar } from "@/components/notes";
-import { noteMatchesQuery } from "@/data/notes";
-import { useNotes } from "@/hooks/useNotes";
+import { SearchInput, EmptyState } from "@/components/common";
+import { NoteCard, NotesFilterSidebar, CreateNoteModal } from "@/components/notes";
+import { useNotes } from "@/hooks/queries/useNotes";
+import { useCourses } from "@/hooks/queries/useCourses";
 import { useToast } from "@/hooks/useToast";
 import type { NoteFilterKey } from "@/types/notes";
+import type { NoteRecord } from "@/services/note.service";
+import type { Course } from "@/types/courses";
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 16 },
@@ -27,19 +29,65 @@ const gridStagger = {
 
 const RECENT_THRESHOLD_DAYS = 3;
 
+function getEditedDaysAgo(updatedAt: string): number {
+    const date = new Date(updatedAt);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
+
+function noteRecordMatchesQuery(note: NoteRecord, query: string, courses: Course[]): boolean {
+    const q = query.trim().toLowerCase();
+    if (q === "") return true;
+
+    const course = courses.find((c) => c.id === note.courseId);
+    const courseCode = course ? course.code.toLowerCase() : "";
+    const courseName = course ? course.name.toLowerCase() : "";
+
+    return (
+        note.title.toLowerCase().includes(q) ||
+        (note.preview ?? "").toLowerCase().includes(q) ||
+        courseCode.includes(q) ||
+        courseName.includes(q) ||
+        note.tags.some((tag) => tag.toLowerCase().includes(q)) ||
+        note.content.some((block) => {
+            if (block.kind === "heading" || block.kind === "paragraph" || block.kind === "quote") {
+                return block.text.toLowerCase().includes(q);
+            } else if (block.kind === "bullet-list" || block.kind === "numbered-list") {
+                return block.items.some((item) => item.toLowerCase().includes(q));
+            } else if (block.kind === "code") {
+                return block.code.toLowerCase().includes(q);
+            }
+            return false;
+        })
+    );
+}
+
 export function NotesPage() {
-    const { notes: allNotes, toggleFavorite, resetDemoData } = useNotes();
+    const { data: allNotes, loading: notesLoading, error: notesError, createNote, updateNote } = useNotes();
+    const { data: courses, loading: coursesLoading } = useCourses();
     const { showToast } = useToast();
 
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<NoteFilterKey>("all");
-    const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [createModalOpen, setCreateModalOpen] = useState(false);
+
+    async function handleToggleFavorite(id: string) {
+        const note = allNotes.find((n) => n.id === id);
+        if (!note) return;
+        try {
+            await updateNote(id, { favorite: !note.favorite });
+            showToast(note.favorite ? "Removed from Favorites." : "Added to Favorites.", "success");
+        } catch {
+            showToast("Failed to update Favorite.", "error");
+        }
+    }
 
     const counts: Record<NoteFilterKey, number> = useMemo(
         () => ({
             all: allNotes.filter((n) => !n.archived).length,
             favorites: allNotes.filter((n) => n.favorite && !n.archived).length,
-            recent: allNotes.filter((n) => !n.archived && n.editedDaysAgo <= RECENT_THRESHOLD_DAYS).length,
+            recent: allNotes.filter((n) => !n.archived && getEditedDaysAgo(n.updatedAt) <= RECENT_THRESHOLD_DAYS).length,
             archived: allNotes.filter((n) => n.archived).length,
         }),
         [allNotes],
@@ -50,20 +98,20 @@ export function NotesPage() {
 
         if (filter === "favorites") result = result.filter((n) => n.favorite && !n.archived);
         else if (filter === "recent")
-            result = result.filter((n) => !n.archived && n.editedDaysAgo <= RECENT_THRESHOLD_DAYS);
+            result = result.filter((n) => !n.archived && getEditedDaysAgo(n.updatedAt) <= RECENT_THRESHOLD_DAYS);
         else if (filter === "archived") result = result.filter((n) => n.archived);
         else result = result.filter((n) => !n.archived);
 
         if (search.trim() !== "") {
-            result = result.filter((n) => noteMatchesQuery(n, search));
+            result = result.filter((n) => noteRecordMatchesQuery(n, search, courses));
         }
 
         if (filter === "recent") {
-            result = [...result].sort((a, b) => a.editedDaysAgo - b.editedDaysAgo);
+            result = [...result].sort((a, b) => getEditedDaysAgo(a.updatedAt) - getEditedDaysAgo(b.updatedAt));
         }
 
         return result;
-    }, [allNotes, filter, search]);
+    }, [allNotes, filter, search, courses]);
 
     const emptyState = useMemo(() => {
         if (search.trim() !== "") {
@@ -89,10 +137,26 @@ export function NotesPage() {
         }
     }, [search, filter]);
 
-    function handleResetConfirmed() {
-        resetDemoData();
-        setShowResetConfirm(false);
-        showToast("Demo data restored");
+    const loading = notesLoading || coursesLoading;
+
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex h-[50vh] items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (notesError) {
+        return (
+            <DashboardLayout>
+                <div className="flex h-[50vh] flex-col items-center justify-center gap-3 text-center">
+                    <p className="text-[14px] font-medium text-text-primary">Failed to load notes: {notesError}</p>
+                </div>
+            </DashboardLayout>
+        );
     }
 
     return (
@@ -114,14 +178,7 @@ export function NotesPage() {
                     <div className="flex flex-shrink-0 items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setShowResetConfirm(true)}
-                            className="flex items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400"
-                        >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Reset Demo Data</span>
-                        </button>
-                        <button
-                            type="button"
+                            onClick={() => setCreateModalOpen(true)}
                             className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
                         >
                             <Plus className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-90" />
@@ -154,9 +211,18 @@ export function NotesPage() {
                                 initial="hidden"
                                 animate="visible"
                             >
-                                {filteredNotes.map((note) => (
-                                    <NoteCard key={note.id} note={note} onToggleFavorite={toggleFavorite} />
-                                ))}
+                                {filteredNotes.map((note) => {
+                                    const course = courses.find((c) => c.id === note.courseId);
+                                    const courseCode = course ? course.code : "";
+                                    return (
+                                        <NoteCard
+                                            key={note.id}
+                                            note={note}
+                                            courseCode={courseCode}
+                                            onToggleFavorite={handleToggleFavorite}
+                                        />
+                                    );
+                                })}
                             </motion.div>
                         ) : (
                             <div className="rounded-2xl border border-dashed border-zinc-800">
@@ -167,16 +233,11 @@ export function NotesPage() {
                 </div>
             </div>
 
-            <ConfirmDialog
-                open={showResetConfirm}
-                icon={RotateCcw}
-                title="Reset demo data?"
-                description="This clears any local edits, favorites, and archived notes, and restores the original dummy notes."
-                confirmLabel="Reset data"
-                cancelLabel="Cancel"
-                destructive
-                onConfirm={handleResetConfirmed}
-                onCancel={() => setShowResetConfirm(false)}
+            <CreateNoteModal
+                open={createModalOpen}
+                onClose={() => setCreateModalOpen(false)}
+                courses={courses}
+                onCreate={createNote}
             />
         </DashboardLayout>
     );

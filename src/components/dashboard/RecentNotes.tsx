@@ -1,14 +1,9 @@
 import { motion } from "framer-motion";
 import { FileText } from "lucide-react";
 import { SectionCard, ListRow } from "@/components/common";
-
-const recentNotes = [
-  { id: "1", title: "Binary Search Trees — Insertion & Deletion", course: "CS201", time: "2h ago" },
-  { id: "2", title: "Eigenvalues & Eigenvectors Review", course: "MATH301", time: "5h ago" },
-  { id: "3", title: "Neural Network Backpropagation", course: "CS401", time: "1d ago" },
-  { id: "4", title: "SQL Query Optimization Techniques", course: "CS302", time: "2d ago" },
-  { id: "5", title: "Graph Traversal: BFS vs DFS", course: "CS201", time: "3d ago" },
-];
+import { useNotes } from "@/hooks/queries/useNotes";
+import { useCourses } from "@/hooks/queries/useCourses";
+import type { NoteRecord } from "@/services/note.service";
 
 const containerVariant = {
   hidden: { opacity: 0, y: 16 },
@@ -35,23 +30,86 @@ const rowVariant = {
   },
 };
 
-export function RecentNotes() {
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) {
+    return "just now";
+  } else if (diffMins < 60) {
+    return `${diffMins}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else if (diffDays === 1) {
+    return "1d ago";
+  } else {
+    return `${diffDays}d ago`;
+  }
+}
+
+export function RecentNotes({ notes: propNotes, loading: propLoading }: { notes?: NoteRecord[]; loading?: boolean } = {}) {
+  const { data: notesQuery, loading: queryLoading } = useNotes();
+  const { data: courses, loading: coursesLoading } = useCourses();
+
+  const notes = propNotes ?? notesQuery;
+  const notesLoading = propLoading ?? queryLoading;
+
+  const recentNotes = notes
+    .filter((note) => !note.archived)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5);
+
+  const isLoading = notesLoading || coursesLoading;
+
   return (
     <motion.div variants={containerVariant} initial="hidden" animate="visible">
-      <SectionCard icon={FileText} title="Recent Notes" action={{ label: "View All" }}>
+      <SectionCard
+        icon={FileText}
+        title="Recent Notes"
+        action={{
+          label: "View All",
+          onClick: () => {
+            window.location.hash = "#/dashboard/notes";
+          },
+        }}
+      >
         <motion.div
           className="divide-y divide-zinc-800/60"
           variants={listVariant}
           initial="hidden"
           animate="visible"
         >
-          {recentNotes.map((note) => (
-            <motion.div key={note.id} variants={rowVariant}>
-              <ListRow title={note.title} subtitle={note.course} trailing={note.time} />
-            </motion.div>
-          ))}
+          {isLoading ? (
+            <div className="px-5 py-4 text-[13px] text-text-muted">Loading...</div>
+          ) : recentNotes.length === 0 ? (
+            <div className="px-5 py-4 text-[13px] text-text-muted">No recent notes</div>
+          ) : (
+            recentNotes.map((note) => {
+              const course = courses.find((c) => c.id === note.courseId);
+              const courseCode = course ? course.code : "";
+              const timeStr = formatRelativeTime(note.updatedAt);
+              return (
+                <motion.div key={note.id} variants={rowVariant}>
+                  <ListRow
+                    title={note.title}
+                    subtitle={courseCode}
+                    trailing={timeStr}
+                    onClick={() => {
+                      window.location.hash = `#/dashboard/notes/${note.id}`;
+                    }}
+                  />
+                </motion.div>
+              );
+            })
+          )}
         </motion.div>
       </SectionCard>
     </motion.div>
   );
 }
+

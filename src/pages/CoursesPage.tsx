@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { BookOpen } from "lucide-react";
+import { AlertTriangle, BookOpen, Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
 import { CourseCard, CoursesToolbar } from "@/components/courses";
-import { courses } from "@/data/courses";
+import { useCourses } from "@/hooks/queries/useCourses";
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 16 },
@@ -22,6 +22,7 @@ const gridStagger = {
 };
 
 export function CoursesPage() {
+    const { data: courses, loading, error, refresh } = useCourses();
     const [search, setSearch] = useState("");
     const [semester, setSemester] = useState("All Semesters");
 
@@ -36,7 +37,37 @@ export function CoursesPage() {
             const matchesSemester = semester === "All Semesters" || course.semester === semester;
             return matchesSearch && matchesSemester;
         });
-    }, [search, semester]);
+    }, [courses, search, semester]);
+
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-800 py-20 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+                    <p className="text-[14px] font-medium text-text-primary">Loading courses…</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-rose-500/20 py-20 text-center">
+                    <AlertTriangle className="h-8 w-8 text-rose-400" />
+                    <p className="text-[14px] font-medium text-text-primary">Couldn't load courses</p>
+                    <p className="max-w-sm text-[13px] text-text-muted">{error}</p>
+                    <button
+                        type="button"
+                        onClick={() => void refresh()}
+                        className="mt-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                    >
+                        Try again
+                    </button>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     return (
         <DashboardLayout>

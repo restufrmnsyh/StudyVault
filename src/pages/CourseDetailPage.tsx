@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
+    AlertTriangle,
     ArrowLeft,
     BarChart3,
     BookOpen,
@@ -11,19 +13,26 @@ import {
     FilePlus,
     FileText,
     Layers,
+    Loader2,
     Pencil,
     PlayCircle,
     StickyNote,
     TrendingUp,
+    Trash2,
     Upload,
     Zap,
     type LucideIcon,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState } from "@/components/common";
+import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState, ConfirmDialog } from "@/components/common";
+import { EditCourseModal } from "@/components/courses";
+import { CreateNoteModal } from "@/components/notes";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
-import { courses, getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
+import { getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
+import { useCourse } from "@/hooks/queries/useCourse";
+import { useNotes } from "@/hooks/queries/useNotes";
+import { useToast } from "@/hooks/useToast";
 import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +118,10 @@ interface QuickAction {
     color: string;
 }
 
+interface QuickActionButtonProps extends QuickAction {
+    onClick?: () => void;
+}
+
 const quickActions: QuickAction[] = [
     { icon: StickyNote, label: "Create Note", color: "from-violet-500 to-indigo-500" },
     { icon: Upload, label: "Upload Material", color: "from-blue-500 to-cyan-500" },
@@ -121,10 +134,11 @@ const quickActions: QuickAction[] = [
  * component covers this shape — StatCard shows a value, ListRow shows list data, neither
  * fits a standalone dummy action button. Kept local since it's only used here so far.
  */
-function QuickActionButton({ icon: Icon, label, color }: QuickAction) {
+function QuickActionButton({ icon: Icon, label, color, onClick }: QuickActionButtonProps) {
     return (
         <button
             type="button"
+            onClick={onClick}
             className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-4 text-center transition-colors duration-200 hover:border-violet-500/25 hover:bg-white/[0.02]"
         >
             <div
@@ -140,7 +154,55 @@ function QuickActionButton({ icon: Icon, label, color }: QuickAction) {
 }
 
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
-    const course = courses.find((c) => c.id === courseId);
+    const { data: course, loading, error, refresh, updateCourse, deleteCourse } = useCourse(courseId);
+    const { createNote } = useNotes();
+    const { showToast } = useToast();
+    const [editOpen, setEditOpen] = useState(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [createNoteOpen, setCreateNoteOpen] = useState(false);
+
+    async function handleDeleteConfirmed() {
+        setDeleting(true);
+        try {
+            await deleteCourse();
+            showToast("Course deleted successfully", "success");
+            window.location.hash = "#/dashboard/courses";
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to delete course", "error");
+            setDeleting(false);
+        }
+    }
+
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-800 py-20 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+                    <p className="text-[14px] font-medium text-text-primary">Loading course…</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-rose-500/20 py-20 text-center">
+                    <AlertTriangle className="h-8 w-8 text-rose-400" />
+                    <p className="text-[14px] font-medium text-text-primary">Couldn't load this course</p>
+                    <p className="max-w-sm text-[13px] text-text-muted">{error}</p>
+                    <button
+                        type="button"
+                        onClick={() => void refresh()}
+                        className="mt-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                    >
+                        Try again
+                    </button>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     if (!course) {
         return (
@@ -205,6 +267,20 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                                 {course.description}
                             </p>
                         </div>
+                        <div className="flex flex-shrink-0 items-center gap-2">
+                            <button type="button" onClick={() => setEditOpen(true)} className={actionButtonClass}>
+                                <Pencil className="h-3 w-3" />
+                                <span className="hidden sm:inline">Edit</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDeleteConfirmOpen(true)}
+                                className="flex h-7 items-center gap-1 rounded-md border border-rose-500/20 bg-rose-500/[0.03] px-2 text-[11px] font-medium text-rose-400 transition-colors hover:bg-rose-500/[0.08]"
+                            >
+                                <Trash2 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Delete</span>
+                            </button>
+                        </div>
                     </div>
                 </motion.div>
 
@@ -256,7 +332,11 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     <SectionCard icon={Zap} title="Quick Actions">
                         <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
                             {quickActions.map((action) => (
-                                <QuickActionButton key={action.label} {...action} />
+                                <QuickActionButton
+                                    key={action.label}
+                                    {...action}
+                                    onClick={action.label === "Create Note" ? () => setCreateNoteOpen(true) : undefined}
+                                />
                             ))}
                         </div>
                     </SectionCard>
@@ -377,6 +457,32 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     </SectionCard>
                 </motion.div>
             </div>
+
+            <EditCourseModal open={editOpen} course={course} onClose={() => setEditOpen(false)} onUpdate={updateCourse} />
+
+            <ConfirmDialog
+                open={deleteConfirmOpen}
+                title={`Delete "${course.name}"?`}
+                description="This action cannot be undone."
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                destructive
+                loading={deleting}
+                onConfirm={handleDeleteConfirmed}
+                onCancel={() => setDeleteConfirmOpen(false)}
+            />
+
+            <CreateNoteModal
+                open={createNoteOpen}
+                onClose={() => setCreateNoteOpen(false)}
+                courses={[course]}
+                defaultCourseId={courseId}
+                onCreate={async (input) => {
+                    const res = await createNote(input);
+                    await refresh();
+                    return res;
+                }}
+            />
         </DashboardLayout>
     );
 }

@@ -70,7 +70,7 @@ export function Navbar() {
             {/* Desktop CTA + mobile toggle */}
             <div className="flex items-center gap-3">
               <a
-                href="#/dashboard"
+                href="#/login"
                 className="group relative hidden overflow-hidden rounded-lg px-4 py-1.5 text-[13px] font-semibold text-white md:inline-flex"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500" />
@@ -130,7 +130,7 @@ export function Navbar() {
                 ))}
                 <div className="mt-2 border-t border-white/[0.06] pt-3">
                   <a
-                    href="#/dashboard"
+                    href="#/login"
                     onClick={closeMobile}
                     className="block w-full rounded-lg bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 py-2.5 text-center text-[14px] font-semibold text-white transition-shadow duration-300 hover:shadow-lg hover:shadow-violet-500/20"
                   >
