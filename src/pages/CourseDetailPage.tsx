@@ -26,10 +26,12 @@ import {
 import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState, ConfirmDialog } from "@/components/common";
 import { EditCourseModal } from "@/components/courses";
+import { CreateNoteModal } from "@/components/notes";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
 import { getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
 import { useCourse } from "@/hooks/queries/useCourse";
+import { useNotes } from "@/hooks/queries/useNotes";
 import { useToast } from "@/hooks/useToast";
 import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
@@ -116,6 +118,10 @@ interface QuickAction {
     color: string;
 }
 
+interface QuickActionButtonProps extends QuickAction {
+    onClick?: () => void;
+}
+
 const quickActions: QuickAction[] = [
     { icon: StickyNote, label: "Create Note", color: "from-violet-500 to-indigo-500" },
     { icon: Upload, label: "Upload Material", color: "from-blue-500 to-cyan-500" },
@@ -128,10 +134,11 @@ const quickActions: QuickAction[] = [
  * component covers this shape — StatCard shows a value, ListRow shows list data, neither
  * fits a standalone dummy action button. Kept local since it's only used here so far.
  */
-function QuickActionButton({ icon: Icon, label, color }: QuickAction) {
+function QuickActionButton({ icon: Icon, label, color, onClick }: QuickActionButtonProps) {
     return (
         <button
             type="button"
+            onClick={onClick}
             className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-4 text-center transition-colors duration-200 hover:border-violet-500/25 hover:bg-white/[0.02]"
         >
             <div
@@ -148,10 +155,12 @@ function QuickActionButton({ icon: Icon, label, color }: QuickAction) {
 
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
     const { data: course, loading, error, refresh, updateCourse, deleteCourse } = useCourse(courseId);
+    const { createNote } = useNotes();
     const { showToast } = useToast();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [createNoteOpen, setCreateNoteOpen] = useState(false);
 
     async function handleDeleteConfirmed() {
         setDeleting(true);
@@ -323,7 +332,11 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     <SectionCard icon={Zap} title="Quick Actions">
                         <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
                             {quickActions.map((action) => (
-                                <QuickActionButton key={action.label} {...action} />
+                                <QuickActionButton
+                                    key={action.label}
+                                    {...action}
+                                    onClick={action.label === "Create Note" ? () => setCreateNoteOpen(true) : undefined}
+                                />
                             ))}
                         </div>
                     </SectionCard>
@@ -457,6 +470,18 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                 loading={deleting}
                 onConfirm={handleDeleteConfirmed}
                 onCancel={() => setDeleteConfirmOpen(false)}
+            />
+
+            <CreateNoteModal
+                open={createNoteOpen}
+                onClose={() => setCreateNoteOpen(false)}
+                courses={[course]}
+                defaultCourseId={courseId}
+                onCreate={async (input) => {
+                    const res = await createNote(input);
+                    await refresh();
+                    return res;
+                }}
             />
         </DashboardLayout>
     );

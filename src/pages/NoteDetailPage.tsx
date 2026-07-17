@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
     Archive,
@@ -7,8 +7,6 @@ import {
     CalendarDays,
     Clock,
     Copy,
-    Eye,
-    FilePlus,
     FileText,
     Layers,
     MoreHorizontal,
@@ -17,17 +15,18 @@ import {
     Star,
     Trash2,
     X,
-    type LucideIcon,
+    Loader2,
+    AlertTriangle,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { SectionCard, ListRow, EmptyState, ConfirmDialog, RelatedCourseCard } from "@/components/common";
+import { SectionCard, EmptyState, ConfirmDialog, RelatedCourseCard } from "@/components/common";
 import { NoteContentBlocks } from "@/components/notes";
-import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
-import { getRelatedMaterials, getNoteActivity, noteContentToPlainText, plainTextToNoteContent } from "@/data/notes";
-import { courses } from "@/data/courses";
-import { useNotes } from "@/hooks/useNotes";
+import { useNote } from "@/hooks/queries/useNote";
+import { getCourseById, toCourse } from "@/services/course.service";
 import { useToast } from "@/hooks/useToast";
-import type { Note, NoteActivityType } from "@/types/notes";
+import type { NoteContentBlock } from "@/types/notes";
+import type { Course } from "@/types/courses";
+import type { NoteRecord } from "@/services/note.service";
 import { cn } from "@/lib/utils";
 
 interface NoteDetailPageProps {
@@ -36,9 +35,6 @@ interface NoteDetailPageProps {
 
 type NoteDetailMode = "view" | "edit";
 
-/** Draft values bound to the Edit Mode form fields. Kept as its own shape (raw text for
- *  tags/content) rather than reusing Note directly, since form inputs need plain strings
- *  while the saved note needs parsed tags/blocks. */
 interface EditForm {
     title: string;
     tagsText: string;
@@ -54,31 +50,70 @@ const fadeInUp = {
     },
 };
 
-const activityIcon: Record<NoteActivityType, LucideIcon> = {
-    created: FilePlus,
-    edited: Pencil,
-    viewed: Eye,
-    favorited: Star,
-};
-
-const activityLabel: Record<NoteActivityType, string> = {
-    created: "Created this note",
-    edited: "Edited this note",
-    viewed: "Viewed this note",
-    favorited: "Favorited this note",
-};
-
-/** Shared input/textarea chrome so Edit Mode fields match SearchInput's focus styling
- *  instead of introducing a second visual language for form controls. */
 const fieldClassName =
     "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-text-primary outline-none ring-violet-500/15 transition-all duration-200 placeholder:text-text-muted focus:border-violet-500/30 focus:bg-white/[0.04] focus:ring-4";
 
-/**
- * "More actions" menu for the header. Archive/Unarchive is wired to the real store
- * (Sprint 3.4D); Duplicate/Move/Export remain placeholders for a future sprint, so this
- * still isn't worth generalizing into components/common until more of it is real.
- */
-function MoreActionsMenu({ note, onToggleArchive }: { note: Note; onToggleArchive: () => void }) {
+function noteContentToPlainText(blocks: NoteContentBlock[]): string {
+    return blocks
+        .map((block) => {
+            switch (block.kind) {
+                case "heading":
+                case "paragraph":
+                case "quote":
+                    return block.text;
+                case "bullet-list":
+                    return block.items.map((item) => `- ${item}`).join("\n");
+                case "numbered-list":
+                    return block.items.map((item, i) => `${i + 1}. ${item}`).join("\n");
+                case "code":
+                    return block.code;
+                default:
+                    return "";
+            }
+        })
+        .join("\n\n");
+}
+
+function plainTextToNoteContent(text: string): NoteContentBlock[] {
+    return text
+        .split(/\n\s*\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+        .map((paragraph) => ({ kind: "paragraph", text: paragraph.replace(/\s*\n\s*/g, " ") }));
+}
+
+function formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) {
+        return "just now";
+    } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+    } else if (diffDays === 1) {
+        return "1d ago";
+    } else {
+        return `${diffDays}d ago`;
+    }
+}
+
+function formatCalendarDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
+function MoreActionsMenu({ note, onToggleArchive }: { note: NoteRecord; onToggleArchive: () => void }) {
     const [open, setOpen] = useState(false);
 
     return (
@@ -128,16 +163,64 @@ function MoreActionsMenu({ note, onToggleArchive }: { note: Note; onToggleArchiv
 }
 
 export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
-    const { notes, toggleFavorite, toggleArchive, updateNote } = useNotes();
+    const { data: note, loading, error, refresh, updateNote, deleteNote } = useNote(noteId);
     const { showToast } = useToast();
-    const note = notes.find((n) => n.id === noteId);
 
-    // Edit Mode state. `form` holds the in-progress draft while `mode === "edit"` and is
-    // discarded on Cancel — the committed note itself now lives in the global store, not
-    // in page-local state, so Notes Overview stays in sync the instant Save is pressed.
     const [mode, setMode] = useState<NoteDetailMode>("view");
     const [form, setForm] = useState<EditForm | null>(null);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [relatedCourse, setRelatedCourse] = useState<Course | null>(null);
+
+    useEffect(() => {
+        if (!note?.courseId) return;
+        let active = true;
+        getCourseById(note.courseId)
+            .then((record) => {
+                if (active && record) {
+                    setRelatedCourse(toCourse(record));
+                }
+            })
+            .catch(() => {
+                // Fail silently for details panel Course lookup
+            });
+        return () => {
+            active = false;
+        };
+    }, [note?.courseId]);
+
+    if (loading || deleting) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-800 py-20 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+                    <p className="text-[14px] font-medium text-text-primary">
+                        {deleting ? "Deleting note…" : "Loading note…"}
+                    </p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-rose-500/20 py-20 text-center">
+                    <AlertTriangle className="h-8 w-8 text-rose-400" />
+                    <p className="text-[14px] font-medium text-text-primary">Couldn't load this note</p>
+                    <p className="max-w-sm text-[13px] text-text-muted">{error}</p>
+                    <button
+                        type="button"
+                        onClick={() => void refresh()}
+                        className="mt-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[13px] font-medium text-text-secondary transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     if (!note) {
         return (
@@ -155,10 +238,6 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
             </DashboardLayout>
         );
     }
-
-    const materials = getRelatedMaterials(note);
-    const activity = getNoteActivity(note);
-    const relatedCourse = courses.find((c) => c.code === note.courseCode);
 
     const isDirty =
         form !== null &&
@@ -189,21 +268,66 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
         }
     }
 
-    function handleSave() {
+    async function handleSave() {
         if (!form || form.title.trim() === "") return;
-        updateNote(note!.id, {
-            title: form.title.trim(),
-            tags: form.tagsText
+        try {
+            const tags = form.tagsText
                 .split(",")
                 .map((t) => t.trim())
-                .filter(Boolean),
-            content: plainTextToNoteContent(form.contentText),
-        });
-        exitEditMode();
-        showToast("Note saved locally");
+                .filter(Boolean);
+            const content = plainTextToNoteContent(form.contentText);
+            const preview = form.contentText.length > 150 ? form.contentText.slice(0, 150) + "..." : form.contentText;
+
+            await updateNote({
+                title: form.title.trim(),
+                tags,
+                content,
+                preview,
+            });
+            exitEditMode();
+            showToast("Note saved successfully", "success");
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to save note", "error");
+        }
+    }
+
+    async function handleToggleFavorite() {
+        if (!note) return;
+        try {
+            await updateNote({ favorite: !note.favorite });
+            showToast(note.favorite ? "Removed from favorites" : "Added to favorites", "success");
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to update favorite status", "error");
+        }
+    }
+
+    async function handleToggleArchive() {
+        if (!note) return;
+        try {
+            await updateNote({ archived: !note.archived });
+            showToast(note.archived ? "Note unarchived" : "Note archived", "success");
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to update archive status", "error");
+        }
+    }
+
+    async function handleDeleteConfirmed() {
+        setDeleteConfirmOpen(false);
+        setDeleting(true);
+        try {
+            await deleteNote();
+            showToast("Note deleted successfully", "success");
+            window.location.hash = "#/dashboard/notes";
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to delete note", "error");
+            setDeleting(false);
+        }
     }
 
     const isEditing = mode === "edit" && form !== null;
+    const courseCode = relatedCourse ? relatedCourse.code : "";
+    const relativeTime = formatRelativeTime(note.updatedAt);
+    const calendarDate = formatCalendarDate(note.createdAt);
 
     return (
         <DashboardLayout>
@@ -228,7 +352,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                         <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[11px] font-medium text-text-muted">
-                                    {note.courseCode}
+                                    {courseCode}
                                 </span>
                                 {note.archived && (
                                     <span className="inline-flex items-center gap-1 rounded-md bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-text-muted">
@@ -276,11 +400,11 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-text-muted">
                                         <span className="flex items-center gap-1.5">
                                             <Clock className="h-3.5 w-3.5" />
-                                            Edited {note.lastEdited}
+                                            Edited {relativeTime}
                                         </span>
                                         <span className="flex items-center gap-1.5">
                                             <CalendarDays className="h-3.5 w-3.5" />
-                                            Created {note.createdDate}
+                                            Created {calendarDate}
                                         </span>
                                     </div>
 
@@ -304,7 +428,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                             <div className="flex flex-shrink-0 items-center gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => toggleFavorite(note.id)}
+                                    onClick={handleToggleFavorite}
                                     aria-label={note.favorite ? "Remove from favorites" : "Add to favorites"}
                                     aria-pressed={note.favorite}
                                     className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] transition-colors hover:border-violet-500/30"
@@ -316,7 +440,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                                         )}
                                     />
                                 </button>
-                                <MoreActionsMenu note={note} onToggleArchive={() => toggleArchive(note.id)} />
+                                <MoreActionsMenu note={note} onToggleArchive={handleToggleArchive} />
                             </div>
                         )}
                     </div>
@@ -364,48 +488,21 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
                         <SectionCard icon={Layers} title="Related Materials">
-                            {materials.length > 0 ? (
-                                <div className="divide-y divide-zinc-800/60">
-                                    {materials.map((material) => (
-                                        <ListRow
-                                            key={material.id}
-                                            icon={materialIcon[material.type]}
-                                            title={material.name}
-                                            subtitle={materialTypeLabel[material.type]}
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    icon={Layers}
-                                    title="No related materials"
-                                    description="Files attached to this note will show up here."
-                                />
-                            )}
+                            <EmptyState
+                                icon={Layers}
+                                title="No related materials"
+                                description="Files attached to this note will show up here."
+                            />
                         </SectionCard>
                     </motion.div>
 
                     <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
                         <SectionCard icon={Clock} title="Recent Activity">
-                            {activity.length > 0 ? (
-                                <div className="divide-y divide-zinc-800/60">
-                                    {activity.map((item) => (
-                                        <ListRow
-                                            key={item.id}
-                                            icon={activityIcon[item.type]}
-                                            title={activityLabel[item.type]}
-                                            subtitle={note.courseCode}
-                                            trailing={item.updatedAt}
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <EmptyState
-                                    icon={Clock}
-                                    title="No activity yet"
-                                    description="Actions on this note will show up here."
-                                />
-                            )}
+                            <EmptyState
+                                icon={Clock}
+                                title="No activity yet"
+                                description="Actions on this note will show up here."
+                            />
                         </SectionCard>
                     </motion.div>
                 </div>
@@ -442,6 +539,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                         <>
                             <button
                                 type="button"
+                                onClick={() => setDeleteConfirmOpen(true)}
                                 className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.03] px-5 py-2.5 text-[13px] font-semibold text-rose-400 transition-colors hover:bg-rose-500/[0.08]"
                             >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -469,6 +567,18 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                 destructive
                 onConfirm={exitEditMode}
                 onCancel={() => setShowDiscardConfirm(false)}
+            />
+
+            <ConfirmDialog
+                open={deleteConfirmOpen}
+                icon={Trash2}
+                title="Delete note?"
+                description="Are you sure you want to delete this note? This action cannot be undone."
+                confirmLabel="Delete Note"
+                cancelLabel="Cancel"
+                destructive
+                onConfirm={handleDeleteConfirmed}
+                onCancel={() => setDeleteConfirmOpen(false)}
             />
         </DashboardLayout>
     );

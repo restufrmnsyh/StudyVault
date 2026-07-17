@@ -97,3 +97,93 @@ export async function getNotesByCourse(courseId: string): Promise<NoteRecord[]> 
 
     return (data ?? []).map(mapNote);
 }
+
+export interface CreateNoteInput {
+    courseId: string;
+    title: string;
+    content: string;
+    tags: string[];
+    favorite: boolean;
+    archived: boolean;
+}
+
+export async function createNote(input: CreateNoteInput): Promise<NoteRecord> {
+    const {
+        data: { user },
+        error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+        throw new Error(authError.message);
+    }
+    if (!user) {
+        throw new Error("You need to be signed in to create a note.");
+    }
+
+    const { plainTextToNoteContent } = await import("@/data/notes");
+    const contentBlocks = plainTextToNoteContent(input.content);
+    const previewText = input.content.length > 150 ? input.content.slice(0, 150) + "..." : input.content;
+
+    const { data, error } = await supabase
+        .from("notes")
+        .insert({
+            user_id: user.id,
+            course_id: input.courseId,
+            title: input.title,
+            content: contentBlocks,
+            preview: previewText,
+            tags: input.tags,
+            favorite: input.favorite,
+            archived: input.archived,
+        })
+        .select()
+        .single<NoteRow>();
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    return mapNote(data);
+}
+
+export interface UpdateNoteInput {
+    title?: string;
+    content?: NoteContentBlock[];
+    preview?: string | null;
+    tags?: string[];
+    favorite?: boolean;
+    archived?: boolean;
+}
+
+export async function updateNote(id: string, input: UpdateNoteInput): Promise<NoteRecord> {
+    const { data, error } = await supabase
+        .from("notes")
+        .update({
+            ...(input.title !== undefined && { title: input.title }),
+            ...(input.content !== undefined && { content: input.content }),
+            ...(input.preview !== undefined && { preview: input.preview }),
+            ...(input.tags !== undefined && { tags: input.tags }),
+            ...(input.favorite !== undefined && { favorite: input.favorite }),
+            ...(input.archived !== undefined && { archived: input.archived }),
+        })
+        .eq("id", id)
+        .select()
+        .single<NoteRow>();
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    return mapNote(data);
+}
+
+export async function deleteNote(id: string): Promise<void> {
+    const { error } = await supabase
+        .from("notes")
+        .delete()
+        .eq("id", id);
+
+    if (error) {
+        throw new Error(error.message);
+    }
+}

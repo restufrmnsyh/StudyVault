@@ -3,6 +3,7 @@ import { FileText } from "lucide-react";
 import { SectionCard, ListRow } from "@/components/common";
 import { useNotes } from "@/hooks/queries/useNotes";
 import { useCourses } from "@/hooks/queries/useCourses";
+import type { NoteRecord } from "@/services/note.service";
 
 const containerVariant = {
   hidden: { opacity: 0, y: 16 },
@@ -51,9 +52,12 @@ function formatRelativeTime(dateString: string): string {
   }
 }
 
-export function RecentNotes() {
-  const { data: notes, loading: notesLoading } = useNotes();
+export function RecentNotes({ notes: propNotes, loading: propLoading }: { notes?: NoteRecord[]; loading?: boolean } = {}) {
+  const { data: notesQuery, loading: queryLoading } = useNotes();
   const { data: courses, loading: coursesLoading } = useCourses();
+
+  const notes = propNotes ?? notesQuery;
+  const notesLoading = propLoading ?? queryLoading;
 
   const recentNotes = notes
     .filter((note) => !note.archived)

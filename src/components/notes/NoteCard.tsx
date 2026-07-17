@@ -1,11 +1,34 @@
 import { motion } from "framer-motion";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Note } from "@/types/notes";
+import type { NoteRecord } from "@/services/note.service";
 
 interface NoteCardProps {
-    note: Note;
+    note: NoteRecord;
+    courseCode?: string;
     onToggleFavorite?: (id: string) => void;
+}
+
+function formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) {
+        return "just now";
+    } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+    } else if (diffDays === 1) {
+        return "1d ago";
+    } else {
+        return `${diffDays}d ago`;
+    }
 }
 
 const cardVariant = {
@@ -17,7 +40,8 @@ const cardVariant = {
     },
 };
 
-export function NoteCard({ note, onToggleFavorite }: NoteCardProps) {
+export function NoteCard({ note, courseCode = "", onToggleFavorite }: NoteCardProps) {
+    const relativeTime = formatRelativeTime(note.updatedAt);
     return (
         <motion.a
             href={`#/dashboard/notes/${note.id}`}
@@ -28,7 +52,7 @@ export function NoteCard({ note, onToggleFavorite }: NoteCardProps) {
         >
             <div className="mb-3 flex items-start justify-between gap-3">
                 <span className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[11px] font-medium text-text-muted">
-                    {note.courseCode}
+                    {courseCode}
                 </span>
                 <button
                     type="button"
@@ -68,7 +92,7 @@ export function NoteCard({ note, onToggleFavorite }: NoteCardProps) {
                 </div>
             )}
 
-            <p className="mt-auto text-[11px] text-text-muted">Edited {note.lastEdited}</p>
+            <p className="mt-auto text-[11px] text-text-muted">Edited {relativeTime}</p>
         </motion.a>
     );
 }

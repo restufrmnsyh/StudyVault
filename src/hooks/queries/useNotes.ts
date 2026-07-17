@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
-import { getNotes, type NoteRecord } from "@/services/note.service";
+import {
+    getNotes,
+    createNote as createNoteService,
+    updateNote as updateNoteService,
+    type NoteRecord,
+    type CreateNoteInput,
+    type UpdateNoteInput,
+} from "@/services/note.service";
 
 export interface UseNotesResult {
     data: NoteRecord[];
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
+    createNote: (input: CreateNoteInput) => Promise<NoteRecord>;
+    updateNote: (id: string, input: UpdateNoteInput) => Promise<NoteRecord>;
 }
 
 /**
@@ -36,6 +45,38 @@ export function useNotes(): UseNotesResult {
         }
     }, []);
 
+    const createNote = useCallback(async (input: CreateNoteInput): Promise<NoteRecord> => {
+        const record = await createNoteService(input);
+        setData((prev) => [record, ...prev]);
+        return record;
+    }, []);
+
+    const updateNote = useCallback(async (id: string, input: UpdateNoteInput): Promise<NoteRecord> => {
+        let rollbackRecord: NoteRecord | null = null;
+        
+        setData((prev) => {
+            return prev.map((n) => {
+                if (n.id === id) {
+                    rollbackRecord = n;
+                    return { ...n, ...input } as NoteRecord;
+                }
+                return n;
+            });
+        });
+
+        try {
+            const record = await updateNoteService(id, input);
+            setData((prev) => prev.map((n) => (n.id === id ? record : n)));
+            return record;
+        } catch (err) {
+            if (rollbackRecord) {
+                const recordToRestore = rollbackRecord as NoteRecord;
+                setData((prev) => prev.map((n) => (n.id === id ? recordToRestore : n)));
+            }
+            throw err;
+        }
+    }, []);
+
     // See hooks/queries/useCourses.ts for why the initial load is a separate promise
     // chain rather than just calling refresh() here.
     useEffect(() => {
@@ -57,5 +98,5 @@ export function useNotes(): UseNotesResult {
         };
     }, []);
 
-    return { data, loading, error, refresh };
+    return { data, loading, error, refresh, createNote, updateNote };
 }

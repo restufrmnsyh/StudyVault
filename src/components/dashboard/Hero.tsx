@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
 import { FolderPlus, StickyNote } from "lucide-react";
 import { currentUser } from "@/data/dashboard";
-import { useNotes } from "@/hooks/useNotes";
 import { usePlanner } from "@/hooks/usePlanner";
 import type { Course } from "@/types/courses";
+import type { NoteRecord } from "@/services/note.service";
 
 function getGreeting(): string {
     const hour = new Date().getHours();
@@ -40,14 +40,13 @@ interface HeroProps {
      *  need to share, so creating a course updates this count live. */
     courses: Course[];
     coursesLoading: boolean;
+    notes: NoteRecord[];
+    notesLoading: boolean;
     onCreateCourse: () => void;
+    onCreateNote: () => void;
 }
 
-export function Hero({ courses, coursesLoading, onCreateCourse }: HeroProps) {
-    // Notes/Planner aren't migrated to Supabase yet, so their counts come from the same
-    // local stores their own pages read, to stay consistent with what the user actually
-    // sees on those pages right now.
-    const { notes } = useNotes();
+export function Hero({ courses, coursesLoading, notes, notesLoading, onCreateCourse, onCreateNote }: HeroProps) {
     const { tasks } = usePlanner();
 
     return (
@@ -75,7 +74,7 @@ export function Hero({ courses, coursesLoading, onCreateCourse }: HeroProps) {
 
                 <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-zinc-800/80 pt-5">
                     <HeroStat label="Courses" value={coursesLoading ? "–" : String(courses.length)} />
-                    <HeroStat label="Notes" value={String(notes.length)} />
+                    <HeroStat label="Notes" value={notesLoading ? "–" : String(notes.length)} />
                     <HeroStat label="Planner Tasks" value={String(tasks.length)} />
                 </div>
 
@@ -90,6 +89,7 @@ export function Hero({ courses, coursesLoading, onCreateCourse }: HeroProps) {
                     </button>
                     <button
                         type="button"
+                        onClick={onCreateNote}
                         className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-2.5 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-white/[0.05] hover:text-text-primary"
                     >
                         <StickyNote className="h-3.5 w-3.5" />

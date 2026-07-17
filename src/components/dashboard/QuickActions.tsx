@@ -36,7 +36,7 @@ const cardVariant = {
  * "Open Planner" even though that route already exists — since this sprint's scope is
  * just the one feature, not wiring every quick action.
  */
-export function QuickActions({ onCreateCourse }: { onCreateCourse: () => void }) {
+export function QuickActions({ onCreateCourse, onCreateNote }: { onCreateCourse: () => void; onCreateNote?: () => void }) {
     return (
         <motion.div
             className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
@@ -48,7 +48,13 @@ export function QuickActions({ onCreateCourse }: { onCreateCourse: () => void })
                 <motion.button
                     key={action.label}
                     type="button"
-                    onClick={action.label === "Create Course" ? onCreateCourse : undefined}
+                    onClick={
+                        action.label === "Create Course"
+                            ? onCreateCourse
+                            : action.label === "Create Note"
+                            ? onCreateNote
+                            : undefined
+                    }
                     variants={cardVariant}
                     whileHover={{ y: -3, transition: { duration: 0.2, ease: "easeOut" } }}
                     whileTap={{ scale: 0.98 }}
