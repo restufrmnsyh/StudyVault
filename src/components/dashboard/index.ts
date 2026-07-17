@@ -9,3 +9,4 @@ export { OverviewCards } from "./OverviewCards";
 export { ContinueLearning } from "./ContinueLearning";
 export { UpcomingDeadlines } from "./UpcomingDeadlines";
 export { RecentActivity } from "./RecentActivity";
+export { RecentNotes } from "./RecentNotes";

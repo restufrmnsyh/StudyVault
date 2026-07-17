@@ -7,6 +7,7 @@ import {
   ContinueLearning,
   UpcomingDeadlines,
   RecentActivity,
+  RecentNotes,
   OverviewCards,
 } from "@/components/dashboard";
 import { CreateCourseModal } from "@/components/courses";
@@ -32,6 +33,7 @@ export function DashboardPage() {
         <ContinueLearning />
         <UpcomingDeadlines />
         <RecentActivity />
+        <RecentNotes />
         <OverviewCards />
       </div>
 
