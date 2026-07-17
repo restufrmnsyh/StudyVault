@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
     AlertTriangle,
@@ -27,14 +27,40 @@ import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState, ConfirmDialog } from "@/components/common";
 import { EditCourseModal } from "@/components/courses";
 import { CreateNoteModal } from "@/components/notes";
+import { UploadMaterialModal, MaterialPreviewModal } from "@/components/courses";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
-import { getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
+import { getCourseAssignments, getCourseActivity } from "@/data/courses";
 import { useCourse } from "@/hooks/queries/useCourse";
 import { useNotes } from "@/hooks/queries/useNotes";
+import { useMaterials } from "@/hooks/queries/useMaterials";
 import { useToast } from "@/hooks/useToast";
-import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
+import type { CourseMaterial, CourseNote, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
+import { getMaterialType, formatBytes, canPreviewInBrowser } from "@/services/material.service";
+import { getNotesByCourse, type NoteRecord } from "@/services/note.service";
+
+function formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) {
+        return "just now";
+    } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+    } else if (diffDays === 1) {
+        return "1d ago";
+    } else {
+        return `${diffDays}d ago`;
+    }
+}
 
 interface CourseDetailPageProps {
     courseId: string;
@@ -63,19 +89,32 @@ const actionButtonClass =
  * Preview/Download pair for a single material row. Kept local to this file (not exported
  * to components/common) since it's a one-off composition of existing button styling used
  * only inside the Materials Library — extracting it to a shared file wasn't warranted.
+ *
+ * Sprint 6.3: which action shows is decided by material.service.ts's
+ * canPreviewInBrowser(), not re-decided here — PDF/Image get "Preview" (opens
+ * MaterialPreviewModal via onPreview), everything else (including video, for now)
+ * gets a direct "Download" link using the material's existing public fileUrl.
  */
-function MaterialActions({ material }: { material: CourseMaterial }) {
-    return (
-        <>
-            <button type="button" aria-label={`Preview ${material.name}`} className={actionButtonClass}>
+function MaterialActions({ material, onPreview }: { material: CourseMaterial; onPreview: (material: CourseMaterial) => void }) {
+    if (canPreviewInBrowser(material.type)) {
+        return (
+            <button type="button" onClick={() => onPreview(material)} className={actionButtonClass}>
                 <Eye className="h-3 w-3" />
                 <span className="hidden sm:inline">Preview</span>
             </button>
-            <button type="button" aria-label={`Download ${material.name}`} className={actionButtonClass}>
-                <Download className="h-3 w-3" />
-                <span className="hidden sm:inline">Download</span>
-            </button>
-        </>
+        );
+    }
+
+    return (
+        <a
+            href={material.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={actionButtonClass}
+        >
+            <Download className="h-3 w-3" />
+            <span className="hidden sm:inline">Download</span>
+        </a>
     );
 }
 
@@ -156,11 +195,72 @@ function QuickActionButton({ icon: Icon, label, color, onClick }: QuickActionBut
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
     const { data: course, loading, error, refresh, updateCourse, deleteCourse } = useCourse(courseId);
     const { createNote } = useNotes();
+    const { data: materialsRecord, loading: materialsLoading, uploadMaterial } = useMaterials(courseId);
     const { showToast } = useToast();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [createNoteOpen, setCreateNoteOpen] = useState(false);
+    const [uploadModalOpen, setUploadModalOpen] = useState(false);
+    const [previewMaterial, setPreviewMaterial] = useState<CourseMaterial | null>(null);
+
+    const [courseNotes, setCourseNotes] = useState<NoteRecord[]>([]);
+    const [notesLoading, setNotesLoading] = useState(true);
+
+    const refreshNotes = useCallback(async () => {
+        if (!courseId) return;
+        try {
+            const list = await getNotesByCourse(courseId);
+            setCourseNotes(list);
+        } catch {
+            // ignore
+        } finally {
+            setNotesLoading(false);
+        }
+    }, [courseId]);
+
+    useEffect(() => {
+        if (!courseId) return;
+        let active = true;
+        const timer = setTimeout(() => {
+            setNotesLoading(true);
+        }, 0);
+
+        getNotesByCourse(courseId)
+            .then((list) => {
+                if (active) setCourseNotes(list);
+            })
+            .catch(() => { })
+            .finally(() => {
+                if (active) setNotesLoading(false);
+            });
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [courseId]);
+
+    const pageLoading = loading || materialsLoading || notesLoading;
+
+    const materials: CourseMaterial[] = useMemo(() => {
+        return materialsRecord.map((m) => ({
+            id: m.id,
+            name: m.title,
+            type: getMaterialType(m.mimeType, m.fileName),
+            size: formatBytes(m.fileSize),
+            updatedAt: formatRelativeTime(m.updatedAt),
+            fileUrl: m.fileUrl,
+            mimeType: m.mimeType,
+        }));
+    }, [materialsRecord]);
+
+    const notes: CourseNote[] = useMemo(() => {
+        return courseNotes.map((n) => ({
+            id: n.id,
+            title: n.title,
+            updatedAt: formatRelativeTime(n.updatedAt),
+        }));
+    }, [courseNotes]);
 
     async function handleDeleteConfirmed() {
         setDeleting(true);
@@ -174,7 +274,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         }
     }
 
-    if (loading) {
+    if (pageLoading) {
         return (
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-800 py-20 text-center">
@@ -221,8 +321,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         );
     }
 
-    const materials = getCourseMaterials(course);
-    const notes = getCourseNotes(course);
+
     const assignments = getCourseAssignments(course);
     const activity = getCourseActivity(course);
 
@@ -298,14 +397,14 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     >
                         <StatCard
                             icon={Layers}
-                            value={String(course.materialsCount)}
+                            value={String(materials.length)}
                             label="Materials"
                             color="from-violet-500 to-indigo-500"
                             compactOnMobile
                         />
                         <StatCard
                             icon={FileText}
-                            value={String(course.notesCount)}
+                            value={String(notes.length)}
                             label="Notes"
                             color="from-blue-500 to-cyan-500"
                             compactOnMobile
@@ -335,7 +434,13 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                                 <QuickActionButton
                                     key={action.label}
                                     {...action}
-                                    onClick={action.label === "Create Note" ? () => setCreateNoteOpen(true) : undefined}
+                                    onClick={
+                                        action.label === "Create Note"
+                                            ? () => setCreateNoteOpen(true)
+                                            : action.label === "Upload Material"
+                                                ? () => setUploadModalOpen(true)
+                                                : undefined
+                                    }
                                 />
                             ))}
                         </div>
@@ -373,7 +478,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                                         title={material.name}
                                         subtitle={`${materialTypeLabel[material.type]} · ${material.size}`}
                                         trailing={material.updatedAt}
-                                        actions={<MaterialActions material={material} />}
+                                        actions={<MaterialActions material={material} onPreview={setPreviewMaterial} />}
                                     />
                                 ))}
                             </div>
@@ -479,10 +584,20 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                 defaultCourseId={courseId}
                 onCreate={async (input) => {
                     const res = await createNote(input);
+                    await refreshNotes();
                     await refresh();
                     return res;
                 }}
             />
+
+            <UploadMaterialModal
+                open={uploadModalOpen}
+                onClose={() => setUploadModalOpen(false)}
+                course={course}
+                onUpload={uploadMaterial}
+            />
+
+            <MaterialPreviewModal material={previewMaterial} onClose={() => setPreviewMaterial(null)} />
         </DashboardLayout>
     );
 }

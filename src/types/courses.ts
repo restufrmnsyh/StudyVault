@@ -22,6 +22,10 @@ export interface CourseMaterial {
     type: MaterialType;
     size: string;
     updatedAt: string;
+    /** Present for real (Supabase-backed) materials; absent for dummy/generated ones.
+     *  Needed by CourseDetailPage's Preview/Download actions (Sprint 6.3). */
+    fileUrl?: string;
+    mimeType?: string;
 }
 
 export interface CourseNote {
