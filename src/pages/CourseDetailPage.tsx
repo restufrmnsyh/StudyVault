@@ -30,7 +30,6 @@ import { CreateNoteModal } from "@/components/notes";
 import { UploadMaterialModal, MaterialPreviewModal, EditMaterialModal, MaterialContextMenu } from "@/components/courses";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
-import { getCourseAssignments, getCourseActivity } from "@/data/courses";
 import { useCourse } from "@/hooks/queries/useCourse";
 import { useNotes } from "@/hooks/queries/useNotes";
 import { useMaterials } from "@/hooks/queries/useMaterials";
@@ -317,6 +316,60 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         }));
     }, [courseNotes]);
 
+    // Sprint 6.4.1 — Synthesize activity feed from notes and materials
+    const activity: CourseActivity[] = useMemo(() => {
+        const items: Array<{ item: CourseActivity; sortKey: number }> = [];
+
+        // Generate activity items from notes
+        courseNotes.forEach((note) => {
+            const createdTime = new Date(note.createdAt).getTime();
+            const updatedTime = new Date(note.updatedAt).getTime();
+
+            // Created note activity
+            items.push({
+                item: {
+                    id: `note-created-${note.id}`,
+                    type: "created",
+                    description: `Created "${note.title}"`,
+                    updatedAt: formatRelativeTime(note.createdAt),
+                },
+                sortKey: createdTime,
+            });
+
+            // Updated note activity (only if updated significantly after creation)
+            if (updatedTime > createdTime + 1000) {
+                items.push({
+                    item: {
+                        id: `note-updated-${note.id}`,
+                        type: "edited",
+                        description: `Updated "${note.title}"`,
+                        updatedAt: formatRelativeTime(note.updatedAt),
+                    },
+                    sortKey: updatedTime,
+                });
+            }
+        });
+
+        // Generate activity items from materials
+        materialsRecord.forEach((material) => {
+            const uploadedTime = new Date(material.createdAt).getTime();
+            items.push({
+                item: {
+                    id: `material-uploaded-${material.id}`,
+                    type: "uploaded",
+                    description: `Uploaded "${material.title}"`,
+                    updatedAt: formatRelativeTime(material.createdAt),
+                },
+                sortKey: uploadedTime,
+            });
+        });
+
+        // Sort by most recent first and extract items
+        return items
+            .sort((a, b) => b.sortKey - a.sortKey)
+            .map((entry) => entry.item);
+    }, [courseNotes, materialsRecord]);
+
     async function handleDeleteConfirmed() {
         setDeleting(true);
         try {
@@ -377,8 +430,9 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
     }
 
 
-    const assignments = getCourseAssignments(course);
-    const activity = getCourseActivity(course);
+    // Sprint 6.4.1 — Assignments module not yet implemented
+    // Keeping empty state until assignments table and service are created
+    const assignments: CourseAssignment[] = [];
 
     return (
         <DashboardLayout>
@@ -614,8 +668,14 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     <SectionCard icon={FileText} title="Recent Notes">
                         {notes.length > 0 ? (
                             <div className="divide-y divide-zinc-800/60">
-                                {notes.map((note) => (
-                                    <ListRow key={note.id} title={note.title} subtitle={course.code} trailing={note.updatedAt} />
+                                {notes.slice(0, 5).map((note) => (
+                                    <a
+                                        key={note.id}
+                                        href={`#/dashboard/notes/${note.id}`}
+                                        className="block transition-colors hover:bg-white/[0.02]"
+                                    >
+                                        <ListRow title={note.title} subtitle={course.code} trailing={note.updatedAt} />
+                                    </a>
                                 ))}
                             </div>
                         ) : (

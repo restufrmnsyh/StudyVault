@@ -14,6 +14,9 @@ import { CreateCourseModal } from "@/components/courses";
 import { CreateNoteModal } from "@/components/notes";
 import { useCourses } from "@/hooks/queries/useCourses";
 import { useNotes } from "@/hooks/queries/useNotes";
+import { useProfile } from "@/hooks/queries/useProfile";
+import { usePlanner } from "@/hooks/queries/usePlanner";
+import { useAllMaterials } from "@/hooks/queries/useAllMaterials";
 
 export function DashboardPage() {
   // Owned here (not inside Hero) so Hero's stat count and CreateCourseModal's create
@@ -21,6 +24,9 @@ export function DashboardPage() {
   // immediately, with no page reload and no second fetch.
   const { data: courses, loading: coursesLoading, createCourse } = useCourses();
   const { data: notes, loading: notesLoading, createNote } = useNotes();
+  const { data: profile } = useProfile();
+  const { data: tasks, loading: tasksLoading } = usePlanner();
+  const { data: materials, loading: materialsLoading } = useAllMaterials();
   const [createCourseOpen, setCreateCourseOpen] = useState(false);
   const [createNoteOpen, setCreateNoteOpen] = useState(false);
 
@@ -32,6 +38,7 @@ export function DashboardPage() {
           coursesLoading={coursesLoading}
           notes={notes}
           notesLoading={notesLoading}
+          profile={profile}
           onCreateCourse={() => setCreateCourseOpen(true)}
           onCreateNote={() => setCreateNoteOpen(true)}
         />
@@ -39,12 +46,17 @@ export function DashboardPage() {
           onCreateCourse={() => setCreateCourseOpen(true)}
           onCreateNote={() => setCreateNoteOpen(true)}
         />
-        <TodaysFocus />
+        <TodaysFocus tasks={tasks} loading={tasksLoading} courses={courses} />
         <ContinueLearning />
         <UpcomingDeadlines />
         <RecentActivity />
         <RecentNotes notes={notes} loading={notesLoading} />
-        <OverviewCards />
+        <OverviewCards
+          coursesCount={coursesLoading ? 0 : courses.length}
+          notesCount={notesLoading ? 0 : notes.length}
+          materialsCount={materialsLoading ? 0 : materials.length}
+          tasksCount={tasksLoading ? 0 : tasks.length}
+        />
       </div>
 
       <CreateCourseModal

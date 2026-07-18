@@ -188,6 +188,24 @@ export async function getMaterialsByCourse(courseId: string): Promise<MaterialRe
     return (data || []).map(mapMaterialRow);
 }
 
+/**
+ * Sprint 6.5.2 — Fetches ALL materials owned by the signed-in user across all courses.
+ * Used for dashboard statistics. RLS scopes this to the caller automatically.
+ */
+export async function getAllMaterials(): Promise<MaterialRecord[]> {
+    const { data, error } = await supabase
+        .from("materials")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .returns<MaterialRow[]>();
+
+    if (error) {
+        throw new Error(error.message);
+    }
+
+    return (data || []).map(mapMaterialRow);
+}
+
 // ---------------------------------------------------------------------------
 // Sprint 6.4 — Material Management
 // ---------------------------------------------------------------------------
