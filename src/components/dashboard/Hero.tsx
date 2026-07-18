@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { FolderPlus, StickyNote } from "lucide-react";
-import { currentUser } from "@/data/dashboard";
 import { usePlanner } from "@/hooks/usePlanner";
+import { useAuth } from "@/auth/useAuth";
 import type { Course } from "@/types/courses";
 import type { NoteRecord } from "@/services/note.service";
+import type { ProfileRecord } from "@/services/profile.service";
 
 function getGreeting(): string {
     const hour = new Date().getHours();
@@ -11,10 +12,6 @@ function getGreeting(): string {
     if (hour < 17) return "Good Afternoon";
     return "Good Evening";
 }
-
-// Not backed by a real column yet — Sprint context calls this out as "dummy sementara"
-// until semester lives on the profile record.
-const DUMMY_SEMESTER = "Semester 3";
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 16 },
@@ -42,12 +39,41 @@ interface HeroProps {
     coursesLoading: boolean;
     notes: NoteRecord[];
     notesLoading: boolean;
+    profile: ProfileRecord | null;
     onCreateCourse: () => void;
     onCreateNote: () => void;
 }
 
-export function Hero({ courses, coursesLoading, notes, notesLoading, onCreateCourse, onCreateNote }: HeroProps) {
+export function Hero({ courses, coursesLoading, notes, notesLoading, profile, onCreateCourse, onCreateNote }: HeroProps) {
     const { tasks } = usePlanner();
+    const { user } = useAuth();
+
+    // Sprint 6.5.1 — Extract user display information from profile
+    // Fallbacks ensure graceful handling when profile is still loading or fields are null
+    
+    // Extract first name for greeting with smart fallbacks:
+    // 1. Use fullName from profile
+    // 2. Derive from authenticated email (username part)
+    // 3. Default to "Student"
+    let userFirstName = "Student";
+    if (profile?.fullName) {
+        userFirstName = profile.fullName.split(" ")[0];
+    } else if (user?.email) {
+        // Extract username from email (before @)
+        const emailUsername = user.email.split("@")[0];
+        // Capitalize first letter and remove dots/underscores
+        userFirstName = emailUsername
+            .replace(/[._]/g, " ")
+            .split(" ")
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+    }
+
+    // Build compact display format
+    // Line 1: Major (if available)
+    // Line 2: Semester X (if available)
+    const majorDisplay = profile?.major || "";
+    const semesterDisplay = profile?.semester ? `Semester ${profile.semester}` : "";
 
     return (
         <motion.div
@@ -62,15 +88,19 @@ export function Hero({ courses, coursesLoading, notes, notesLoading, onCreateCou
             <div className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-indigo-500/[0.06] blur-3xl" />
 
             <div className="relative">
-                <p className="text-[12px] font-medium tracking-wide text-text-muted uppercase">
-                    {DUMMY_SEMESTER} · {currentUser.role}
-                </p>
-                <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
-                    {getGreeting()}, {currentUser.name.split(" ")[0]} 👋
+                <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
+                    {getGreeting()}, {userFirstName} 👋
                 </h1>
-                <p className="mt-1.5 text-[14px] text-text-muted">
-                    Here's what's happening across your workspace today.
-                </p>
+                {majorDisplay && (
+                    <p className="mt-1.5 text-[14px] text-text-muted">
+                        {majorDisplay}
+                    </p>
+                )}
+                {semesterDisplay && (
+                    <p className="mt-0.5 text-[14px] text-text-muted">
+                        {semesterDisplay}
+                    </p>
+                )}
 
                 <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-zinc-800/80 pt-5">
                     <HeroStat label="Courses" value={coursesLoading ? "–" : String(courses.length)} />

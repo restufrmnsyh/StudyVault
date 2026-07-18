@@ -1,12 +1,15 @@
 import { motion } from "framer-motion";
-import { ClipboardCheck, Play, Sparkles, Target } from "lucide-react";
-import { SectionCard, ListRow } from "@/components/common";
+import { ClipboardCheck, Target } from "lucide-react";
+import { SectionCard, ListRow, EmptyState } from "@/components/common";
+import { selectTodaysFocusTasks, formatDueDate } from "@/utils/planner.utils";
+import type { PlannerTaskRecord } from "@/services/planner.service";
+import type { Course } from "@/types/courses";
 
-const focusItems = [
-    { id: "1", icon: ClipboardCheck, title: "AI Assignment", subtitle: "CS401 · Neural Networks", trailing: "Due Tomorrow" },
-    { id: "2", icon: Play, title: "Continue Learning", subtitle: "Data Structures & Algorithms", trailing: "78%" },
-    { id: "3", icon: Sparkles, title: "Review Flashcards", subtitle: "MATH301 · Eigenvalues", trailing: "15 min" },
-];
+interface TodaysFocusProps {
+    tasks: PlannerTaskRecord[];
+    loading: boolean;
+    courses: Course[];
+}
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 16 },
@@ -17,21 +20,44 @@ const fadeInUp = {
     },
 };
 
-export function TodaysFocus() {
+export function TodaysFocus({ tasks, loading, courses }: TodaysFocusProps) {
+    // Select top 3 priority tasks for today's focus
+    const focusTasks = selectTodaysFocusTasks(tasks, 3);
+
+    // Map course ID to "Code • Name" subtitle
+    const getCourseName = (courseId: string): string => {
+        const course = courses.find((c) => c.id === courseId);
+        return course ? `${course.code} • ${course.name}` : "Unknown Course";
+    };
+
     return (
         <motion.div variants={fadeInUp} initial="hidden" animate="visible">
             <SectionCard icon={Target} title="Today's Focus">
-                <div className="divide-y divide-zinc-800/60">
-                    {focusItems.map((item) => (
-                        <ListRow
-                            key={item.id}
-                            icon={item.icon}
-                            title={item.title}
-                            subtitle={item.subtitle}
-                            trailing={item.trailing}
+                {loading ? (
+                    <div className="px-5 py-8 text-center">
+                        <p className="text-sm text-text-muted">Loading tasks...</p>
+                    </div>
+                ) : focusTasks.length === 0 ? (
+                    <div className="px-5 py-8">
+                        <EmptyState
+                            icon={Target}
+                            title="No tasks today"
+                            description="You're all caught up! Create a new task or check your planner."
                         />
-                    ))}
-                </div>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-zinc-800/60">
+                        {focusTasks.map((task) => (
+                            <ListRow
+                                key={task.id}
+                                icon={ClipboardCheck}
+                                title={task.title}
+                                subtitle={getCourseName(task.courseId)}
+                                trailing={formatDueDate(task.dueDate)}
+                            />
+                        ))}
+                    </div>
+                )}
             </SectionCard>
         </motion.div>
     );

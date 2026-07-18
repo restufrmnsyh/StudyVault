@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
     AlertTriangle,
@@ -27,14 +27,40 @@ import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState, ConfirmDialog } from "@/components/common";
 import { EditCourseModal } from "@/components/courses";
 import { CreateNoteModal } from "@/components/notes";
+import { UploadMaterialModal, MaterialPreviewModal, EditMaterialModal, MaterialContextMenu } from "@/components/courses";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
-import { getCourseMaterials, getCourseNotes, getCourseAssignments, getCourseActivity } from "@/data/courses";
 import { useCourse } from "@/hooks/queries/useCourse";
 import { useNotes } from "@/hooks/queries/useNotes";
+import { useMaterials } from "@/hooks/queries/useMaterials";
 import { useToast } from "@/hooks/useToast";
-import type { CourseMaterial, CourseAssignment, CourseActivity } from "@/types/courses";
+import type { CourseMaterial, CourseNote, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
+import { getMaterialType, formatBytes, canPreviewInBrowser } from "@/services/material.service";
+import type { MaterialRecord } from "@/services/material.service";
+import { getNotesByCourse, type NoteRecord } from "@/services/note.service";
+
+function formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) {
+        return "just now";
+    } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+    } else if (diffDays === 1) {
+        return "1d ago";
+    } else {
+        return `${diffDays}d ago`;
+    }
+}
 
 interface CourseDetailPageProps {
     courseId: string;
@@ -58,26 +84,6 @@ const stagger = {
 
 const actionButtonClass =
     "flex h-7 items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 text-[11px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400";
-
-/**
- * Preview/Download pair for a single material row. Kept local to this file (not exported
- * to components/common) since it's a one-off composition of existing button styling used
- * only inside the Materials Library — extracting it to a shared file wasn't warranted.
- */
-function MaterialActions({ material }: { material: CourseMaterial }) {
-    return (
-        <>
-            <button type="button" aria-label={`Preview ${material.name}`} className={actionButtonClass}>
-                <Eye className="h-3 w-3" />
-                <span className="hidden sm:inline">Preview</span>
-            </button>
-            <button type="button" aria-label={`Download ${material.name}`} className={actionButtonClass}>
-                <Download className="h-3 w-3" />
-                <span className="hidden sm:inline">Download</span>
-            </button>
-        </>
-    );
-}
 
 const statusStyle: Record<CourseAssignment["status"], string> = {
     pending: "bg-white/[0.05] text-text-muted",
@@ -156,11 +162,213 @@ function QuickActionButton({ icon: Icon, label, color, onClick }: QuickActionBut
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
     const { data: course, loading, error, refresh, updateCourse, deleteCourse } = useCourse(courseId);
     const { createNote } = useNotes();
+    const {
+        data: materialsRecord, loading: materialsLoading,
+        uploadMaterial, updateMaterial: updateMaterialHook,
+        replaceMaterialFile: replaceMaterialFileHook, deleteMaterial: deleteMaterialHook,
+    } = useMaterials(courseId);
     const { showToast } = useToast();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [createNoteOpen, setCreateNoteOpen] = useState(false);
+    const [uploadModalOpen, setUploadModalOpen] = useState(false);
+    const [previewMaterial, setPreviewMaterial] = useState<CourseMaterial | null>(null);
+
+    // Sprint 6.4 — Material management state
+    type EditMaterialTab = "details" | "replace";
+    const [editMaterialRecord, setEditMaterialRecord] = useState<MaterialRecord | null>(null);
+    const [editMaterialTab, setEditMaterialTab] = useState<EditMaterialTab>("details");
+    const [deleteMaterialTarget, setDeleteMaterialTarget] = useState<MaterialRecord | null>(null);
+    const [deletingMaterial, setDeletingMaterial] = useState(false);
+
+    const [courseNotes, setCourseNotes] = useState<NoteRecord[]>([]);
+    const [notesLoading, setNotesLoading] = useState(true);
+
+    const refreshNotes = useCallback(async () => {
+        if (!courseId) return;
+        try {
+            const list = await getNotesByCourse(courseId);
+            setCourseNotes(list);
+        } catch {
+            // ignore
+        } finally {
+            setNotesLoading(false);
+        }
+    }, [courseId]);
+
+    useEffect(() => {
+        if (!courseId) return;
+        let active = true;
+        const timer = setTimeout(() => {
+            setNotesLoading(true);
+        }, 0);
+
+        getNotesByCourse(courseId)
+            .then((list) => {
+                if (active) setCourseNotes(list);
+            })
+            .catch(() => { })
+            .finally(() => {
+                if (active) setNotesLoading(false);
+            });
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [courseId]);
+
+    const pageLoading = loading || materialsLoading || notesLoading;
+
+    const materials: CourseMaterial[] = useMemo(() => {
+        return materialsRecord.map((m) => ({
+            id: m.id,
+            name: m.title,
+            type: getMaterialType(m.mimeType, m.fileName),
+            size: formatBytes(m.fileSize),
+            updatedAt: formatRelativeTime(m.updatedAt),
+            fileUrl: m.fileUrl,
+            mimeType: m.mimeType,
+            description: m.description,
+            fileName: m.fileName,
+            fileSize: m.fileSize,
+        }));
+    }, [materialsRecord]);
+
+    // Sprint 6.4 — helper to find the raw MaterialRecord by id
+    const findMaterialRecord = useCallback(
+        (id: string): MaterialRecord | undefined => materialsRecord.find((m) => m.id === id),
+        [materialsRecord],
+    );
+
+    // Context menu handlers
+    const handleMaterialOpen = useCallback((material: CourseMaterial) => {
+        if (canPreviewInBrowser(material.type)) {
+            setPreviewMaterial(material);
+        } else if (material.fileUrl) {
+            window.open(material.fileUrl, "_blank", "noopener,noreferrer");
+        }
+    }, []);
+
+    const handleMaterialRename = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) { setEditMaterialRecord(rec); setEditMaterialTab("details"); }
+    }, [findMaterialRecord]);
+
+    const handleMaterialEditDesc = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) { setEditMaterialRecord(rec); setEditMaterialTab("details"); }
+    }, [findMaterialRecord]);
+
+    const handleMaterialReplaceFile = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) { setEditMaterialRecord(rec); setEditMaterialTab("replace"); }
+    }, [findMaterialRecord]);
+
+    const handleMaterialDownload = useCallback((material: CourseMaterial) => {
+        if (material.fileUrl) {
+            const link = document.createElement("a");
+            link.href = material.fileUrl;
+            link.download = material.fileName || material.name;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }, []);
+
+    const handleMaterialCopyLink = useCallback(async (material: CourseMaterial) => {
+        if (material.fileUrl) {
+            try {
+                await navigator.clipboard.writeText(material.fileUrl);
+                showToast("Link copied to clipboard", "success");
+            } catch {
+                showToast("Failed to copy link", "error");
+            }
+        }
+    }, [showToast]);
+
+    const handleMaterialDelete = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) setDeleteMaterialTarget(rec);
+    }, [findMaterialRecord]);
+
+    const handleDeleteMaterialConfirmed = useCallback(async () => {
+        if (!deleteMaterialTarget) return;
+        setDeletingMaterial(true);
+        try {
+            await deleteMaterialHook(deleteMaterialTarget);
+            showToast("Material deleted successfully", "success");
+            setDeleteMaterialTarget(null);
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to delete material", "error");
+        } finally {
+            setDeletingMaterial(false);
+        }
+    }, [deleteMaterialTarget, deleteMaterialHook, showToast]);
+
+    const notes: CourseNote[] = useMemo(() => {
+        return courseNotes.map((n) => ({
+            id: n.id,
+            title: n.title,
+            updatedAt: formatRelativeTime(n.updatedAt),
+        }));
+    }, [courseNotes]);
+
+    // Sprint 6.4.1 — Synthesize activity feed from notes and materials
+    const activity: CourseActivity[] = useMemo(() => {
+        const items: Array<{ item: CourseActivity; sortKey: number }> = [];
+
+        // Generate activity items from notes
+        courseNotes.forEach((note) => {
+            const createdTime = new Date(note.createdAt).getTime();
+            const updatedTime = new Date(note.updatedAt).getTime();
+
+            // Created note activity
+            items.push({
+                item: {
+                    id: `note-created-${note.id}`,
+                    type: "created",
+                    description: `Created "${note.title}"`,
+                    updatedAt: formatRelativeTime(note.createdAt),
+                },
+                sortKey: createdTime,
+            });
+
+            // Updated note activity (only if updated significantly after creation)
+            if (updatedTime > createdTime + 1000) {
+                items.push({
+                    item: {
+                        id: `note-updated-${note.id}`,
+                        type: "edited",
+                        description: `Updated "${note.title}"`,
+                        updatedAt: formatRelativeTime(note.updatedAt),
+                    },
+                    sortKey: updatedTime,
+                });
+            }
+        });
+
+        // Generate activity items from materials
+        materialsRecord.forEach((material) => {
+            const uploadedTime = new Date(material.createdAt).getTime();
+            items.push({
+                item: {
+                    id: `material-uploaded-${material.id}`,
+                    type: "uploaded",
+                    description: `Uploaded "${material.title}"`,
+                    updatedAt: formatRelativeTime(material.createdAt),
+                },
+                sortKey: uploadedTime,
+            });
+        });
+
+        // Sort by most recent first and extract items
+        return items
+            .sort((a, b) => b.sortKey - a.sortKey)
+            .map((entry) => entry.item);
+    }, [courseNotes, materialsRecord]);
 
     async function handleDeleteConfirmed() {
         setDeleting(true);
@@ -174,7 +382,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         }
     }
 
-    if (loading) {
+    if (pageLoading) {
         return (
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-800 py-20 text-center">
@@ -221,10 +429,10 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         );
     }
 
-    const materials = getCourseMaterials(course);
-    const notes = getCourseNotes(course);
-    const assignments = getCourseAssignments(course);
-    const activity = getCourseActivity(course);
+
+    // Sprint 6.4.1 — Assignments module not yet implemented
+    // Keeping empty state until assignments table and service are created
+    const assignments: CourseAssignment[] = [];
 
     return (
         <DashboardLayout>
@@ -298,14 +506,14 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     >
                         <StatCard
                             icon={Layers}
-                            value={String(course.materialsCount)}
+                            value={String(materials.length)}
                             label="Materials"
                             color="from-violet-500 to-indigo-500"
                             compactOnMobile
                         />
                         <StatCard
                             icon={FileText}
-                            value={String(course.notesCount)}
+                            value={String(notes.length)}
                             label="Notes"
                             color="from-blue-500 to-cyan-500"
                             compactOnMobile
@@ -335,7 +543,13 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                                 <QuickActionButton
                                     key={action.label}
                                     {...action}
-                                    onClick={action.label === "Create Note" ? () => setCreateNoteOpen(true) : undefined}
+                                    onClick={
+                                        action.label === "Create Note"
+                                            ? () => setCreateNoteOpen(true)
+                                            : action.label === "Upload Material"
+                                                ? () => setUploadModalOpen(true)
+                                                : undefined
+                                    }
                                 />
                             ))}
                         </div>
@@ -373,7 +587,18 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                                         title={material.name}
                                         subtitle={`${materialTypeLabel[material.type]} · ${material.size}`}
                                         trailing={material.updatedAt}
-                                        actions={<MaterialActions material={material} />}
+                                        actions={
+                                            <MaterialContextMenu
+                                                material={material}
+                                                onOpen={handleMaterialOpen}
+                                                onRename={handleMaterialRename}
+                                                onEditDescription={handleMaterialEditDesc}
+                                                onReplaceFile={handleMaterialReplaceFile}
+                                                onDownload={handleMaterialDownload}
+                                                onCopyLink={handleMaterialCopyLink}
+                                                onDelete={handleMaterialDelete}
+                                            />
+                                        }
                                     />
                                 ))}
                             </div>
@@ -443,8 +668,14 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     <SectionCard icon={FileText} title="Recent Notes">
                         {notes.length > 0 ? (
                             <div className="divide-y divide-zinc-800/60">
-                                {notes.map((note) => (
-                                    <ListRow key={note.id} title={note.title} subtitle={course.code} trailing={note.updatedAt} />
+                                {notes.slice(0, 5).map((note) => (
+                                    <a
+                                        key={note.id}
+                                        href={`#/dashboard/notes/${note.id}`}
+                                        className="block transition-colors hover:bg-white/[0.02]"
+                                    >
+                                        <ListRow title={note.title} subtitle={course.code} trailing={note.updatedAt} />
+                                    </a>
                                 ))}
                             </div>
                         ) : (
@@ -479,9 +710,40 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                 defaultCourseId={courseId}
                 onCreate={async (input) => {
                     const res = await createNote(input);
+                    await refreshNotes();
                     await refresh();
                     return res;
                 }}
+            />
+
+            <UploadMaterialModal
+                open={uploadModalOpen}
+                onClose={() => setUploadModalOpen(false)}
+                course={course}
+                onUpload={uploadMaterial}
+            />
+
+            <MaterialPreviewModal material={previewMaterial} onClose={() => setPreviewMaterial(null)} />
+
+            <EditMaterialModal
+                open={!!editMaterialRecord}
+                material={editMaterialRecord}
+                onClose={() => setEditMaterialRecord(null)}
+                onUpdate={updateMaterialHook}
+                onReplaceFile={replaceMaterialFileHook}
+                initialTab={editMaterialTab}
+            />
+
+            <ConfirmDialog
+                open={!!deleteMaterialTarget}
+                title={`Delete "${deleteMaterialTarget?.title ?? ""}"?`}
+                description="This will permanently remove the file from storage. This action cannot be undone."
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                destructive
+                loading={deletingMaterial}
+                onConfirm={handleDeleteMaterialConfirmed}
+                onCancel={() => setDeleteMaterialTarget(null)}
             />
         </DashboardLayout>
     );
