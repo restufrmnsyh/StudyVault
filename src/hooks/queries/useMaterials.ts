@@ -3,7 +3,11 @@ import {
     getMaterialsByCourse,
     uploadMaterialFile,
     createMaterial,
+    updateMaterial as updateMaterialService,
+    replaceMaterialFile as replaceMaterialFileService,
+    deleteMaterial as deleteMaterialService,
     type MaterialRecord,
+    type UpdateMaterialInput,
 } from "@/services/material.service";
 
 export interface UseMaterialsResult {
@@ -12,6 +16,9 @@ export interface UseMaterialsResult {
     error: string | null;
     refresh: () => Promise<void>;
     uploadMaterial: (title: string, description: string, file: File) => Promise<MaterialRecord>;
+    updateMaterial: (id: string, updates: UpdateMaterialInput) => Promise<MaterialRecord>;
+    replaceMaterialFile: (material: MaterialRecord, file: File) => Promise<MaterialRecord>;
+    deleteMaterial: (material: MaterialRecord) => Promise<void>;
 }
 
 export function useMaterials(courseId: string): UseMaterialsResult {
@@ -53,9 +60,7 @@ export function useMaterials(courseId: string): UseMaterialsResult {
 
     const uploadMaterial = useCallback(
         async (title: string, description: string, file: File): Promise<MaterialRecord> => {
-            // 1. Upload file to Supabase storage
             const fileUrl = await uploadMaterialFile(courseId, file);
-            // 2. Insert metadata row to materials table
             const record = await createMaterial({
                 courseId,
                 title: title.trim(),
@@ -65,12 +70,41 @@ export function useMaterials(courseId: string): UseMaterialsResult {
                 mimeType: file.type || "application/octet-stream",
                 fileSize: file.size,
             });
-            // 3. Append to state
             setData((prev) => [record, ...prev]);
             return record;
         },
         [courseId],
     );
 
-    return { data, loading, error, refresh, uploadMaterial };
+    const updateMaterial = useCallback(
+        async (id: string, updates: UpdateMaterialInput): Promise<MaterialRecord> => {
+            const updated = await updateMaterialService(id, updates);
+            setData((prev) => prev.map((m) => (m.id === id ? updated : m)));
+            return updated;
+        },
+        [],
+    );
+
+    const replaceMaterialFile = useCallback(
+        async (material: MaterialRecord, file: File): Promise<MaterialRecord> => {
+            const updated = await replaceMaterialFileService(material, file);
+            setData((prev) => prev.map((m) => (m.id === material.id ? updated : m)));
+            return updated;
+        },
+        [],
+    );
+
+    const deleteMaterial = useCallback(
+        async (material: MaterialRecord): Promise<void> => {
+            await deleteMaterialService(material);
+            setData((prev) => prev.filter((m) => m.id !== material.id));
+        },
+        [],
+    );
+
+    return {
+        data, loading, error, refresh,
+        uploadMaterial, updateMaterial, replaceMaterialFile, deleteMaterial,
+    };
 }
+

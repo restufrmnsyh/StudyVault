@@ -187,3 +187,110 @@ export async function getMaterialsByCourse(courseId: string): Promise<MaterialRe
 
     return (data || []).map(mapMaterialRow);
 }
+
+// ---------------------------------------------------------------------------
+// Sprint 6.4 — Material Management
+// ---------------------------------------------------------------------------
+
+export interface UpdateMaterialInput {
+    title?: string;
+    description?: string | null;
+    fileName?: string;
+    fileUrl?: string;
+    mimeType?: string;
+    fileSize?: number;
+}
+
+/**
+ * Extract the Supabase Storage object path from a full public URL.
+ * Upload uses the pattern `{user_id}/{course_id}/{uuid}.{ext}` inside the
+ * `materials` bucket, and the public URL embeds it after `/public/materials/`.
+ */
+function extractStoragePath(fileUrl: string): string | null {
+    const marker = "/object/public/materials/";
+    const idx = fileUrl.indexOf(marker);
+    if (idx === -1) return null;
+    return fileUrl.substring(idx + marker.length);
+}
+
+export async function updateMaterial(
+    id: string,
+    updates: UpdateMaterialInput,
+): Promise<MaterialRecord> {
+    const row: Record<string, unknown> = {};
+    if (updates.title !== undefined) row.title = updates.title;
+    if (updates.description !== undefined) row.description = updates.description;
+    if (updates.fileName !== undefined) row.file_name = updates.fileName;
+    if (updates.fileUrl !== undefined) row.file_url = updates.fileUrl;
+    if (updates.mimeType !== undefined) row.mime_type = updates.mimeType;
+    if (updates.fileSize !== undefined) row.file_size = updates.fileSize;
+
+    const { data, error } = await supabase
+        .from("materials")
+        .update(row)
+        .eq("id", id)
+        .select()
+        .single<MaterialRow>();
+
+    if (error) throw new Error(error.message);
+    return mapMaterialRow(data);
+}
+
+/**
+ * Replace the file backing a material.
+ *
+ * 1. Upload the **new** file to Storage (fail fast — old file untouched).
+ * 2. Update the DB row with the new URL / size / mime / original filename.
+ * 3. Delete the **old** file from Storage (best-effort — if this fails the
+ *    orphan can be cleaned up later, but the user already has the new file).
+ */
+export async function replaceMaterialFile(
+    material: MaterialRecord,
+    newFile: File,
+): Promise<MaterialRecord> {
+    // Upload new file first
+    const newFileUrl = await uploadMaterialFile(material.courseId, newFile);
+
+    // Update DB
+    const updated = await updateMaterial(material.id, {
+        fileName: newFile.name,
+        fileUrl: newFileUrl,
+        mimeType: newFile.type || "application/octet-stream",
+        fileSize: newFile.size,
+    });
+
+    // Best-effort: remove old file from Storage
+    const oldPath = extractStoragePath(material.fileUrl);
+    if (oldPath) {
+        await supabase.storage.from("materials").remove([oldPath]).catch(() => {
+            // Non-critical — orphan will remain but user data is consistent
+        });
+    }
+
+    return updated;
+}
+
+/**
+ * Delete a material completely.
+ *
+ * Order matters for consistency:
+ * 1. Delete from Storage **first**. If this fails, throw — the DB row stays,
+ *    so the user can retry.
+ * 2. Delete the DB row.
+ */
+export async function deleteMaterial(material: MaterialRecord): Promise<void> {
+    // 1. Remove from Storage
+    const path = extractStoragePath(material.fileUrl);
+    if (path) {
+        const { error: storageError } = await supabase.storage
+            .from("materials")
+            .remove([path]);
+        if (storageError) {
+            throw new Error("Failed to delete file from storage. Please try again.");
+        }
+    }
+
+    // 2. Remove DB row
+    const { error } = await supabase.from("materials").delete().eq("id", material.id);
+    if (error) throw new Error(error.message);
+}

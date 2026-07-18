@@ -27,7 +27,7 @@ import { DashboardLayout } from "@/components/dashboard";
 import { StatCard, SectionCard, ListRow, ProgressBar, EmptyState, ConfirmDialog } from "@/components/common";
 import { EditCourseModal } from "@/components/courses";
 import { CreateNoteModal } from "@/components/notes";
-import { UploadMaterialModal, MaterialPreviewModal } from "@/components/courses";
+import { UploadMaterialModal, MaterialPreviewModal, EditMaterialModal, MaterialContextMenu } from "@/components/courses";
 import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import { priorityStyle, priorityLabel } from "@/constants/priority";
 import { getCourseAssignments, getCourseActivity } from "@/data/courses";
@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/useToast";
 import type { CourseMaterial, CourseNote, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
 import { getMaterialType, formatBytes, canPreviewInBrowser } from "@/services/material.service";
+import type { MaterialRecord } from "@/services/material.service";
 import { getNotesByCourse, type NoteRecord } from "@/services/note.service";
 
 function formatRelativeTime(dateString: string): string {
@@ -84,39 +85,6 @@ const stagger = {
 
 const actionButtonClass =
     "flex h-7 items-center gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-2 text-[11px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400";
-
-/**
- * Preview/Download pair for a single material row. Kept local to this file (not exported
- * to components/common) since it's a one-off composition of existing button styling used
- * only inside the Materials Library — extracting it to a shared file wasn't warranted.
- *
- * Sprint 6.3: which action shows is decided by material.service.ts's
- * canPreviewInBrowser(), not re-decided here — PDF/Image get "Preview" (opens
- * MaterialPreviewModal via onPreview), everything else (including video, for now)
- * gets a direct "Download" link using the material's existing public fileUrl.
- */
-function MaterialActions({ material, onPreview }: { material: CourseMaterial; onPreview: (material: CourseMaterial) => void }) {
-    if (canPreviewInBrowser(material.type)) {
-        return (
-            <button type="button" onClick={() => onPreview(material)} className={actionButtonClass}>
-                <Eye className="h-3 w-3" />
-                <span className="hidden sm:inline">Preview</span>
-            </button>
-        );
-    }
-
-    return (
-        <a
-            href={material.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={actionButtonClass}
-        >
-            <Download className="h-3 w-3" />
-            <span className="hidden sm:inline">Download</span>
-        </a>
-    );
-}
 
 const statusStyle: Record<CourseAssignment["status"], string> = {
     pending: "bg-white/[0.05] text-text-muted",
@@ -195,7 +163,11 @@ function QuickActionButton({ icon: Icon, label, color, onClick }: QuickActionBut
 export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
     const { data: course, loading, error, refresh, updateCourse, deleteCourse } = useCourse(courseId);
     const { createNote } = useNotes();
-    const { data: materialsRecord, loading: materialsLoading, uploadMaterial } = useMaterials(courseId);
+    const {
+        data: materialsRecord, loading: materialsLoading,
+        uploadMaterial, updateMaterial: updateMaterialHook,
+        replaceMaterialFile: replaceMaterialFileHook, deleteMaterial: deleteMaterialHook,
+    } = useMaterials(courseId);
     const { showToast } = useToast();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -203,6 +175,13 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
     const [createNoteOpen, setCreateNoteOpen] = useState(false);
     const [uploadModalOpen, setUploadModalOpen] = useState(false);
     const [previewMaterial, setPreviewMaterial] = useState<CourseMaterial | null>(null);
+
+    // Sprint 6.4 — Material management state
+    type EditMaterialTab = "details" | "replace";
+    const [editMaterialRecord, setEditMaterialRecord] = useState<MaterialRecord | null>(null);
+    const [editMaterialTab, setEditMaterialTab] = useState<EditMaterialTab>("details");
+    const [deleteMaterialTarget, setDeleteMaterialTarget] = useState<MaterialRecord | null>(null);
+    const [deletingMaterial, setDeletingMaterial] = useState(false);
 
     const [courseNotes, setCourseNotes] = useState<NoteRecord[]>([]);
     const [notesLoading, setNotesLoading] = useState(true);
@@ -251,8 +230,84 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
             updatedAt: formatRelativeTime(m.updatedAt),
             fileUrl: m.fileUrl,
             mimeType: m.mimeType,
+            description: m.description,
+            fileName: m.fileName,
+            fileSize: m.fileSize,
         }));
     }, [materialsRecord]);
+
+    // Sprint 6.4 — helper to find the raw MaterialRecord by id
+    const findMaterialRecord = useCallback(
+        (id: string): MaterialRecord | undefined => materialsRecord.find((m) => m.id === id),
+        [materialsRecord],
+    );
+
+    // Context menu handlers
+    const handleMaterialOpen = useCallback((material: CourseMaterial) => {
+        if (canPreviewInBrowser(material.type)) {
+            setPreviewMaterial(material);
+        } else if (material.fileUrl) {
+            window.open(material.fileUrl, "_blank", "noopener,noreferrer");
+        }
+    }, []);
+
+    const handleMaterialRename = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) { setEditMaterialRecord(rec); setEditMaterialTab("details"); }
+    }, [findMaterialRecord]);
+
+    const handleMaterialEditDesc = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) { setEditMaterialRecord(rec); setEditMaterialTab("details"); }
+    }, [findMaterialRecord]);
+
+    const handleMaterialReplaceFile = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) { setEditMaterialRecord(rec); setEditMaterialTab("replace"); }
+    }, [findMaterialRecord]);
+
+    const handleMaterialDownload = useCallback((material: CourseMaterial) => {
+        if (material.fileUrl) {
+            const link = document.createElement("a");
+            link.href = material.fileUrl;
+            link.download = material.fileName || material.name;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }, []);
+
+    const handleMaterialCopyLink = useCallback(async (material: CourseMaterial) => {
+        if (material.fileUrl) {
+            try {
+                await navigator.clipboard.writeText(material.fileUrl);
+                showToast("Link copied to clipboard", "success");
+            } catch {
+                showToast("Failed to copy link", "error");
+            }
+        }
+    }, [showToast]);
+
+    const handleMaterialDelete = useCallback((material: CourseMaterial) => {
+        const rec = findMaterialRecord(material.id);
+        if (rec) setDeleteMaterialTarget(rec);
+    }, [findMaterialRecord]);
+
+    const handleDeleteMaterialConfirmed = useCallback(async () => {
+        if (!deleteMaterialTarget) return;
+        setDeletingMaterial(true);
+        try {
+            await deleteMaterialHook(deleteMaterialTarget);
+            showToast("Material deleted successfully", "success");
+            setDeleteMaterialTarget(null);
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to delete material", "error");
+        } finally {
+            setDeletingMaterial(false);
+        }
+    }, [deleteMaterialTarget, deleteMaterialHook, showToast]);
 
     const notes: CourseNote[] = useMemo(() => {
         return courseNotes.map((n) => ({
@@ -478,7 +533,18 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                                         title={material.name}
                                         subtitle={`${materialTypeLabel[material.type]} · ${material.size}`}
                                         trailing={material.updatedAt}
-                                        actions={<MaterialActions material={material} onPreview={setPreviewMaterial} />}
+                                        actions={
+                                            <MaterialContextMenu
+                                                material={material}
+                                                onOpen={handleMaterialOpen}
+                                                onRename={handleMaterialRename}
+                                                onEditDescription={handleMaterialEditDesc}
+                                                onReplaceFile={handleMaterialReplaceFile}
+                                                onDownload={handleMaterialDownload}
+                                                onCopyLink={handleMaterialCopyLink}
+                                                onDelete={handleMaterialDelete}
+                                            />
+                                        }
                                     />
                                 ))}
                             </div>
@@ -598,6 +664,27 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
             />
 
             <MaterialPreviewModal material={previewMaterial} onClose={() => setPreviewMaterial(null)} />
+
+            <EditMaterialModal
+                open={!!editMaterialRecord}
+                material={editMaterialRecord}
+                onClose={() => setEditMaterialRecord(null)}
+                onUpdate={updateMaterialHook}
+                onReplaceFile={replaceMaterialFileHook}
+                initialTab={editMaterialTab}
+            />
+
+            <ConfirmDialog
+                open={!!deleteMaterialTarget}
+                title={`Delete "${deleteMaterialTarget?.title ?? ""}"?`}
+                description="This will permanently remove the file from storage. This action cannot be undone."
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                destructive
+                loading={deletingMaterial}
+                onConfirm={handleDeleteMaterialConfirmed}
+                onCancel={() => setDeleteMaterialTarget(null)}
+            />
         </DashboardLayout>
     );
 }

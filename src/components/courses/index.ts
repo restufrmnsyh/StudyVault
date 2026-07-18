@@ -6,3 +6,5 @@ export { CreateCourseModal } from "./CreateCourseModal";
 export { EditCourseModal } from "./EditCourseModal";
 export { UploadMaterialModal } from "./UploadMaterialModal";
 export { MaterialPreviewModal } from "./MaterialPreviewModal";
+export { EditMaterialModal } from "./EditMaterialModal";
+export { MaterialContextMenu } from "./MaterialContextMenu";
