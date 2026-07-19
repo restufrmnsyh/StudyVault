@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Check, ListChecks, Plus, X } from "lucide-react";
 import { SectionCard, EmptyState } from "@/components/common";
 import { cn } from "@/lib/utils";
-import type { ChecklistItem } from "@/types/planner";
+import type { ChecklistItemRecord } from "@/services/planner.service";
 
 interface ChecklistSectionProps {
-    items: ChecklistItem[];
+    items: ChecklistItemRecord[];
     onToggle: (id: string) => void;
     /** When true, renders rename/add/remove controls (Sprint 3.5C — Task Edit Mode).
      *  Toggle behaves the same either way; only structural edits are gated behind this. */

@@ -2,22 +2,24 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
     AlertCircle,
+    AlertTriangle,
     CalendarClock,
     CalendarDays,
     CheckCircle2,
+    Loader2,
     ListTodo,
-    RotateCcw,
+    Plus,
     Search as SearchIcon,
     Zap,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { EmptyState, SearchInput, StatCard, ConfirmDialog } from "@/components/common";
-import { PlannerFilterTabs, TaskCard } from "@/components/planner";
-import { courses } from "@/data/courses";
-import { TODAY_ISO, WEEK_END_ISO, taskMatchesQuery } from "@/data/planner";
-import { usePlanner } from "@/hooks/usePlanner";
-import { useToast } from "@/hooks/useToast";
+import { EmptyState, SearchInput, StatCard } from "@/components/common";
+import { PlannerFilterTabs, TaskCard, CreateTaskModal } from "@/components/planner";
+import { TODAY_ISO, WEEK_END_ISO } from "@/data/planner";
+import { usePlanner } from "@/hooks/queries/usePlanner";
+import { useCourses } from "@/hooks/queries/useCourses";
 import type { PlannerFilterKey } from "@/types/planner";
+import type { PlannerTaskRecord } from "@/services/planner.service";
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 16 },
@@ -35,32 +37,45 @@ const gridStagger = {
     },
 };
 
+/** Searches title, description, resolved course name/code, and checklist item labels.
+ *  Replaces taskMatchesQuery() from data/planner, which used the legacy courseCode field. */
+function taskMatchesQuerySupabase(task: PlannerTaskRecord, query: string, courseName: string): boolean {
+    const q = query.trim().toLowerCase();
+    if (q === "") return true;
+    return (
+        task.title.toLowerCase().includes(q) ||
+        (task.description ?? "").toLowerCase().includes(q) ||
+        courseName.toLowerCase().includes(q) ||
+        task.checklist.some((item) => item.label.toLowerCase().includes(q))
+    );
+}
+
 export function PlannerPage() {
-    const { tasks, toggleComplete, resetDemoData } = usePlanner();
-    const { showToast } = useToast();
+    const { data: tasks, loading, error, createTask } = usePlanner();
+    const { data: courses } = useCourses();
 
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<PlannerFilterKey>("all");
-    const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [createModalOpen, setCreateModalOpen] = useState(false);
 
     const summary = useMemo(() => {
-        const todaysTasks = tasks.filter((t) => t.dueDateISO === TODAY_ISO && !t.completed).length;
+        const todaysTasks = tasks.filter((t) => t.dueDate === TODAY_ISO && !t.completed).length;
         const dueThisWeek = tasks.filter(
-            (t) => !t.completed && t.dueDateISO >= TODAY_ISO && t.dueDateISO <= WEEK_END_ISO,
+            (t) => !t.completed && t.dueDate >= TODAY_ISO && t.dueDate <= WEEK_END_ISO,
         ).length;
         const completed = tasks.filter((t) => t.completed).length;
-        const overdue = tasks.filter((t) => !t.completed && t.dueDateISO < TODAY_ISO).length;
+        const overdue = tasks.filter((t) => !t.completed && t.dueDate < TODAY_ISO).length;
         return { todaysTasks, dueThisWeek, completed, overdue };
     }, [tasks]);
 
     const counts: Record<PlannerFilterKey, number> = useMemo(
         () => ({
             all: tasks.length,
-            today: tasks.filter((t) => t.dueDateISO === TODAY_ISO).length,
-            upcoming: tasks.filter((t) => !t.completed && t.dueDateISO > TODAY_ISO).length,
+            today: tasks.filter((t) => t.dueDate === TODAY_ISO).length,
+            upcoming: tasks.filter((t) => !t.completed && t.dueDate > TODAY_ISO).length,
             completed: tasks.filter((t) => t.completed).length,
             "high-priority": tasks.filter((t) => !t.completed && t.priority === "high").length,
-            overdue: tasks.filter((t) => !t.completed && t.dueDateISO < TODAY_ISO).length,
+            overdue: tasks.filter((t) => !t.completed && t.dueDate < TODAY_ISO).length,
         }),
         [tasks],
     );
@@ -68,25 +83,29 @@ export function PlannerPage() {
     const filteredTasks = useMemo(() => {
         let result = tasks;
 
-        if (filter === "today") result = result.filter((t) => t.dueDateISO === TODAY_ISO);
-        else if (filter === "upcoming") result = result.filter((t) => !t.completed && t.dueDateISO > TODAY_ISO);
+        if (filter === "today") result = result.filter((t) => t.dueDate === TODAY_ISO);
+        else if (filter === "upcoming") result = result.filter((t) => !t.completed && t.dueDate > TODAY_ISO);
         else if (filter === "completed") result = result.filter((t) => t.completed);
         else if (filter === "high-priority") result = result.filter((t) => !t.completed && t.priority === "high");
-        else if (filter === "overdue") result = result.filter((t) => !t.completed && t.dueDateISO < TODAY_ISO);
+        else if (filter === "overdue") result = result.filter((t) => !t.completed && t.dueDate < TODAY_ISO);
 
         if (search.trim() !== "") {
-            result = result.filter((t) => taskMatchesQuery(t, search));
+            result = result.filter((t) => {
+                const course = courses.find((c) => c.id === t.courseId);
+                const name = course ? `${course.code} ${course.name}` : "";
+                return taskMatchesQuerySupabase(t, search, name);
+            });
         }
 
-        return [...result].sort((a, b) => a.dueDateISO.localeCompare(b.dueDateISO));
-    }, [tasks, filter, search]);
+        return [...result].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    }, [tasks, courses, filter, search]);
 
     const emptyState = useMemo(() => {
         if (search.trim() !== "") {
             return {
                 icon: SearchIcon,
                 title: "No tasks found",
-                description: "Try a different search term — search now also looks inside checklist items.",
+                description: "Try a different search term — search also looks inside checklist items.",
             };
         }
         switch (filter) {
@@ -117,14 +136,30 @@ export function PlannerPage() {
                     description: "You're all caught up — overdue tasks will show up here.",
                 };
             default:
-                return { icon: ListTodo, title: "No tasks yet", description: "Tasks you add will show up here." };
+                return { icon: ListTodo, title: "No tasks yet", description: "Tasks you create will show up here." };
         }
     }, [search, filter]);
 
-    function handleResetConfirmed() {
-        resetDemoData();
-        setShowResetConfirm(false);
-        showToast("Planner reset");
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex h-[50vh] items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <DashboardLayout>
+                <div className="flex h-[50vh] flex-col items-center justify-center gap-3 text-center">
+                    <AlertTriangle className="h-8 w-8 text-rose-400" />
+                    <p className="text-[14px] font-medium text-text-primary">Couldn't load tasks</p>
+                    <p className="max-w-sm text-[13px] text-text-muted">{error}</p>
+                </div>
+            </DashboardLayout>
+        );
     }
 
     return (
@@ -143,13 +178,16 @@ export function PlannerPage() {
                             Keep track of what's due across every course, in one place.
                         </p>
                     </div>
+
+                    {/* Primary action — same gradient button style as "New Note" in NotesPage */}
                     <button
                         type="button"
-                        onClick={() => setShowResetConfirm(true)}
-                        className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                        id="planner-new-task-btn"
+                        onClick={() => setCreateModalOpen(true)}
+                        className="group flex flex-shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
                     >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Reset Demo Data</span>
+                        <Plus className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-90" />
+                        New Task
                     </button>
                 </motion.div>
 
@@ -212,8 +250,8 @@ export function PlannerPage() {
                             <TaskCard
                                 key={task.id}
                                 task={task}
-                                courseName={courses.find((c) => c.code === task.courseCode)?.name}
-                                onToggleComplete={toggleComplete}
+                                courseName={courses.find((c) => c.id === task.courseId)?.name}
+                                // onToggleComplete omitted — Supabase-backed toggle is a follow-up sprint
                             />
                         ))}
                     </motion.div>
@@ -224,15 +262,11 @@ export function PlannerPage() {
                 )}
             </div>
 
-            <ConfirmDialog
-                open={showResetConfirm}
-                title="Reset planner to demo data?"
-                description="This clears any edits, checklist changes, or completions you've made and restores the original dummy tasks."
-                confirmLabel="Reset planner"
-                cancelLabel="Cancel"
-                destructive
-                onConfirm={handleResetConfirmed}
-                onCancel={() => setShowResetConfirm(false)}
+            <CreateTaskModal
+                open={createModalOpen}
+                onClose={() => setCreateModalOpen(false)}
+                onCreate={createTask}
+                courses={courses}
             />
         </DashboardLayout>
     );

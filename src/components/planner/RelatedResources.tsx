@@ -1,16 +1,18 @@
 import { FileText, Layers, Paperclip } from "lucide-react";
 import { SectionCard, EmptyState, RelatedCourseCard } from "@/components/common";
 import type { Course } from "@/types/courses";
-import type { Note } from "@/types/notes";
+import type { NoteRecord } from "@/services/note.service";
 
 interface RelatedResourcesProps {
     course?: Course;
-    relatedNotes: Note[];
+    /** Notes filtered to this task's course, from useNotes() (Supabase). */
+    relatedNotes: NoteRecord[];
+    /** Full course list from useCourses() — used to resolve note.courseId → code. */
+    courses: Course[];
 }
 
-/** One row in the Related Notes list. Kept local — only used here, mirrors the shape of
- *  RelatedCourseCard's "Open X" button without needing a shared abstraction just yet. */
-function RelatedNoteRow({ note }: { note: Note }) {
+function RelatedNoteRow({ note, courses }: { note: NoteRecord; courses: Course[] }) {
+    const course = courses.find((c) => c.id === note.courseId);
     return (
         <div className="flex items-center gap-3 px-5 py-3.5">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white/[0.03] text-text-muted">
@@ -18,7 +20,9 @@ function RelatedNoteRow({ note }: { note: Note }) {
             </div>
             <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-medium text-text-primary">{note.title}</p>
-                <p className="mt-1 truncate text-[11px] text-text-muted">{note.courseCode}</p>
+                {course && (
+                    <p className="mt-1 truncate text-[11px] text-text-muted">{course.code}</p>
+                )}
             </div>
             <a
                 href={`#/dashboard/notes/${note.id}`}
@@ -30,7 +34,7 @@ function RelatedNoteRow({ note }: { note: Note }) {
     );
 }
 
-export function RelatedResources({ course, relatedNotes }: RelatedResourcesProps) {
+export function RelatedResources({ course, relatedNotes, courses }: RelatedResourcesProps) {
     return (
         <div className="space-y-6">
             <div>
@@ -54,7 +58,7 @@ export function RelatedResources({ course, relatedNotes }: RelatedResourcesProps
                 {relatedNotes.length > 0 ? (
                     <div className="divide-y divide-zinc-800/60">
                         {relatedNotes.map((note) => (
-                            <RelatedNoteRow key={note.id} note={note} />
+                            <RelatedNoteRow key={note.id} note={note} courses={courses} />
                         ))}
                     </div>
                 ) : (
