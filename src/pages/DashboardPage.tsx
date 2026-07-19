@@ -47,9 +47,21 @@ export function DashboardPage() {
           onCreateNote={() => setCreateNoteOpen(true)}
         />
         <TodaysFocus tasks={tasks} loading={tasksLoading} courses={courses} />
-        <ContinueLearning />
-        <UpcomingDeadlines />
-        <RecentActivity />
+        <ContinueLearning
+          courses={courses}
+          notes={notes}
+          materials={materials}
+          tasks={tasks}
+          loading={coursesLoading}
+        />
+        <UpcomingDeadlines tasks={tasks} loading={tasksLoading} courses={courses} />
+        <RecentActivity
+          notes={notes}
+          materials={materials}
+          tasks={tasks}
+          courses={courses}
+          loading={notesLoading || materialsLoading || tasksLoading}
+        />
         <RecentNotes notes={notes} loading={notesLoading} />
         <OverviewCards
           coursesCount={coursesLoading ? 0 : courses.length}
