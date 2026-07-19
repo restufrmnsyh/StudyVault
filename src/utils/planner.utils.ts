@@ -115,3 +115,26 @@ export function getDaysUntil(date: Date | string): number {
     const diffTime = target.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
+
+/**
+ * Selects upcoming incomplete tasks for the Upcoming Deadlines widget.
+ * 
+ * Sprint 6.5.4 — Simple chronological selection of next deadlines.
+ * 
+ * Rules:
+ * 1. Exclude completed tasks
+ * 2. Sort by nearest due date (already sorted by service)
+ * 3. Return maximum N tasks
+ * 
+ * @param tasks - All planner tasks (pre-sorted by due date ascending)
+ * @param maxCount - Maximum number of tasks to return (default: 5)
+ * @returns Array of upcoming incomplete tasks
+ */
+export function selectUpcomingDeadlines(
+    tasks: PlannerTaskRecord[],
+    maxCount: number = 5
+): PlannerTaskRecord[] {
+    return tasks
+        .filter((t) => !t.completed)
+        .slice(0, maxCount);
+}
