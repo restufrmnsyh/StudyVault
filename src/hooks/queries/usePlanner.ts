@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { getPlannerTasks, type PlannerTaskRecord } from "@/services/planner.service";
+import {
+    getPlannerTasks,
+    createPlannerTask,
+    type PlannerTaskRecord,
+    type CreatePlannerTaskInput,
+} from "@/services/planner.service";
 
 export interface UsePlannerResult {
     data: PlannerTaskRecord[];
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
+    /** Creates a task via Supabase and appends it to the list sorted by due date.
+     *  Throws on failure so the caller (CreateTaskModal) can surface an error toast. */
+    createTask: (input: CreatePlannerTaskInput) => Promise<PlannerTaskRecord>;
 }
 
 /**
@@ -56,5 +64,12 @@ export function usePlanner(): UsePlannerResult {
         };
     }, []);
 
-    return { data, loading, error, refresh };
-}
+    const createTask = useCallback(async (input: CreatePlannerTaskInput): Promise<PlannerTaskRecord> => {
+        const record = await createPlannerTask(input);
+        // Optimistic-append, sorted by due date ascending — same convention as getPlannerTasks().
+        setData((prev) => [...prev, record].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+        return record;
+    }, []);
+
+    return { data, loading, error, refresh, createTask };
+}

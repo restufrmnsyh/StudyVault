@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { AlignLeft, ArrowLeft, ListTodo, Pencil, Save, TrendingUp, X } from "lucide-react";
+import { AlignLeft, ArrowLeft, ListTodo, Loader2, Pencil, Save, TrendingUp, X } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
 import { SectionCard, ProgressBar, ConfirmDialog } from "@/components/common";
 import { TaskDetailHeader, ChecklistSection, RelatedResources } from "@/components/planner";
-import { formatDateFromISO } from "@/data/planner";
-import { courses } from "@/data/courses";
-import { notes } from "@/data/notes";
-import { priorityLabel, priorityStyle } from "@/constants/priority";
-import { usePlanner } from "@/hooks/usePlanner";
+import { usePlannerTask } from "@/hooks/queries/usePlannerTask";
+import { useCourses } from "@/hooks/queries/useCourses";
+import { useNotes } from "@/hooks/queries/useNotes";
+import { replaceTaskChecklist } from "@/services/planner.service";
 import { useToast } from "@/hooks/useToast";
+import { priorityLabel, priorityStyle } from "@/constants/priority";
 import { cn } from "@/lib/utils";
-import type { ChecklistItem } from "@/types/planner";
+import type { ChecklistItemRecord } from "@/services/planner.service";
 import type { AssignmentPriority } from "@/types/courses";
 
 interface TaskDetailPageProps {
@@ -20,11 +20,12 @@ interface TaskDetailPageProps {
 
 type TaskDetailMode = "view" | "edit";
 
-/** Draft values bound to the Edit Mode form fields, plus a separate checklist draft so
- *  Cancel can revert structural edits (add/remove/rename) without touching the store. */
+/** Draft values bound to the Edit Mode form fields. Keeps `dueDateISO` as the local
+ *  key name (matching the <input type="date"> binding) and maps to `dueDate` on save. */
 interface TaskFieldsForm {
     title: string;
     description: string;
+    /** ISO date (YYYY-MM-DD) — maps to UpdatePlannerTaskInput.dueDate on save. */
     dueDateISO: string;
     priority: AssignmentPriority;
     progress: number;
@@ -39,39 +40,39 @@ const fadeInUp = {
     },
 };
 
-/** Shared input/textarea chrome — matches Note Edit Mode's fields rather than a new
- *  visual language for forms. */
+/** Shared input/textarea chrome — unchanged from the original TaskDetailPage. */
 const fieldClassName =
     "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-text-primary outline-none ring-violet-500/15 transition-all duration-200 placeholder:text-text-muted focus:border-violet-500/30 focus:bg-white/[0.04] focus:ring-4";
 
-function buildFormFromTask(task: { title: string; description: string; dueDateISO: string; priority: AssignmentPriority; progress: number }): TaskFieldsForm {
-    return {
-        title: task.title,
-        description: task.description,
-        dueDateISO: task.dueDateISO,
-        priority: task.priority,
-        progress: task.progress,
-    };
-}
-
-function checklistEqual(a: ChecklistItem[], b: ChecklistItem[]): boolean {
+function checklistEqual(a: ChecklistItemRecord[], b: ChecklistItemRecord[]): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
-    const { tasks, toggleChecklistItem, updateTask } = usePlanner();
+    const { data: task, loading, error, refresh, updateTask, toggleChecklistItem } = usePlannerTask(taskId);
+    const { data: courses } = useCourses();
+    const { data: allNotes } = useNotes();
     const { showToast } = useToast();
-    const task = tasks.find((t) => t.id === taskId);
 
-    // Edit Mode state only — the committed task now lives in PlannerContext (backed by
-    // localStorage), so Planner Overview stays in sync the instant Save is pressed. This
-    // mirrors NoteDetailPage's `form` + `useNotes()` split from the Notes module.
     const [mode, setMode] = useState<TaskDetailMode>("view");
     const [form, setForm] = useState<TaskFieldsForm | null>(null);
-    const [draftChecklist, setDraftChecklist] = useState<ChecklistItem[] | null>(null);
+    const [draftChecklist, setDraftChecklist] = useState<ChecklistItemRecord[] | null>(null);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+    const [saving, setSaving] = useState(false);
 
-    if (!task) {
+    // ── Loading / not-found states ────────────────────────────────────────────
+
+    if (loading) {
+        return (
+            <DashboardLayout>
+                <div className="flex h-[50vh] items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-violet-500" />
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (error || !task) {
         return (
             <DashboardLayout>
                 <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-800 py-20 text-center">
@@ -88,6 +89,13 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
         );
     }
 
+    // ── Derived data ──────────────────────────────────────────────────────────
+
+    const relatedCourse = courses.find((c) => c.id === task.courseId);
+    const relatedNotes = allNotes.filter((n) => n.courseId === task.courseId).slice(0, 3);
+
+    // ── Edit mode helpers ─────────────────────────────────────────────────────
+
     const isEditing = mode === "edit" && form !== null && draftChecklist !== null;
 
     const isDirty =
@@ -95,14 +103,20 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
         form !== null &&
         draftChecklist !== null &&
         (form.title.trim() !== task.title ||
-            form.description.trim() !== task.description ||
-            form.dueDateISO !== task.dueDateISO ||
+            form.description.trim() !== (task.description ?? "") ||
+            form.dueDateISO !== task.dueDate ||
             form.priority !== task.priority ||
             form.progress !== task.progress ||
             !checklistEqual(draftChecklist, task.checklist));
 
     function startEdit() {
-        setForm(buildFormFromTask(task!));
+        setForm({
+            title: task!.title,
+            description: task!.description ?? "",
+            dueDateISO: task!.dueDate, // PlannerTaskRecord.dueDate is the ISO field
+            priority: task!.priority,
+            progress: task!.progress,
+        });
         setDraftChecklist([...task!.checklist]);
         setMode("edit");
     }
@@ -122,28 +136,45 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
         }
     }
 
-    function handleSave() {
-        if (!form || !draftChecklist || form.title.trim() === "") return;
-        updateTask(task!.id, {
-            title: form.title.trim(),
-            description: form.description.trim(),
-            dueDateISO: form.dueDateISO,
-            dueDate: formatDateFromISO(form.dueDateISO),
-            priority: form.priority,
-            progress: form.progress,
-            checklist: draftChecklist,
-        });
-        exitEditMode();
-        showToast("Task saved locally");
+    async function handleSave() {
+        if (!form || !draftChecklist || form.title.trim() === "" || saving) return;
+
+        setSaving(true);
+        try {
+            // 1. Save scalar fields — updateTask() replaces hook data with the returned record.
+            await updateTask({
+                title: form.title.trim(),
+                description: form.description.trim() || null,
+                dueDate: form.dueDateISO,
+                priority: form.priority,
+                progress: form.progress,
+            });
+
+            // 2. Save checklist structure if it changed — separate table (task_checklist).
+            if (!checklistEqual(draftChecklist, task!.checklist)) {
+                await replaceTaskChecklist(task!.id, draftChecklist);
+            }
+
+            // 3. Re-fetch so hook data reflects the final persisted state (especially
+            //    the rebuilt checklist positions after replaceTaskChecklist).
+            await refresh();
+
+            exitEditMode();
+            showToast("Task saved.");
+        } catch (err) {
+            showToast(err instanceof Error ? err.message : "Failed to save task.", "error");
+        } finally {
+            setSaving(false);
+        }
     }
 
-    // View-mode checklist toggle dispatches straight to PlannerContext (synced + persisted
-    // immediately). Edit-mode toggle mutates the local draft instead, so Cancel can revert it.
+    // View-mode toggle dispatches to Supabase via usePlannerTask (optimistic).
+    // Edit-mode toggle mutates the local draft so Cancel can revert structural edits.
     function toggleChecklistItemHandler(id: string) {
         if (isEditing && draftChecklist) {
             setDraftChecklist((prev) => prev!.map((item) => (item.id === id ? { ...item, done: !item.done } : item)));
         } else {
-            toggleChecklistItem(task!.id, id);
+            void toggleChecklistItem(id);
         }
     }
 
@@ -153,7 +184,17 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
     function addChecklistItem(label: string) {
         setDraftChecklist((prev) =>
-            prev ? [...prev, { id: `${task!.id}-checklist-new-${Date.now()}`, label, done: false }] : prev,
+            prev
+                ? [
+                    ...prev,
+                    {
+                        id: `${task!.id}-checklist-new-${Date.now()}`,
+                        label,
+                        done: false,
+                        position: prev.length,
+                    },
+                ]
+                : prev,
         );
     }
 
@@ -161,13 +202,12 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
         setDraftChecklist((prev) => (prev ? prev.filter((item) => item.id !== id) : prev));
     }
 
-    const relatedCourse = courses.find((c) => c.code === task.courseCode);
-    const relatedNotes = notes.filter((n) => n.courseCode === task.courseCode && !n.archived).slice(0, 3);
+    // ── Render ────────────────────────────────────────────────────────────────
 
     return (
         <DashboardLayout>
             <div className="space-y-6 lg:space-y-8">
-                {/* Back button */}
+                {/* Back link */}
                 <a
                     href="#/dashboard/planner"
                     className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted transition-colors hover:text-text-primary"
@@ -181,15 +221,15 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                     {isEditing && form ? (
                         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6">
                             <span className="rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[11px] font-medium text-text-muted">
-                                {relatedCourse?.name ?? task.courseCode}
+                                {relatedCourse?.name ?? task.courseId}
                             </span>
 
                             <div className="mt-2.5">
-                                <label htmlFor="task-title" className="sr-only">
+                                <label htmlFor="task-edit-title" className="sr-only">
                                     Task title
                                 </label>
                                 <input
-                                    id="task-title"
+                                    id="task-edit-title"
                                     type="text"
                                     value={form.title}
                                     onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -200,11 +240,14 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
                             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label htmlFor="task-due-date" className="mb-1.5 block text-[11px] font-medium text-text-muted">
+                                    <label
+                                        htmlFor="task-edit-due-date"
+                                        className="mb-1.5 block text-[11px] font-medium text-text-muted"
+                                    >
                                         Due date
                                     </label>
                                     <input
-                                        id="task-due-date"
+                                        id="task-edit-due-date"
                                         type="date"
                                         value={form.dueDateISO}
                                         onChange={(e) => setForm({ ...form, dueDateISO: e.target.value })}
@@ -282,11 +325,11 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                         <div className="p-5 sm:p-6">
                             {isEditing && form ? (
                                 <>
-                                    <label htmlFor="task-description" className="sr-only">
+                                    <label htmlFor="task-edit-description" className="sr-only">
                                         Task description
                                     </label>
                                     <textarea
-                                        id="task-description"
+                                        id="task-edit-description"
                                         value={form.description}
                                         onChange={(e) => setForm({ ...form, description: e.target.value })}
                                         placeholder="Describe this task..."
@@ -295,7 +338,9 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                                     />
                                 </>
                             ) : (
-                                <p className="text-[14px] leading-relaxed text-text-secondary">{task.description}</p>
+                                <p className="text-[14px] leading-relaxed text-text-secondary">
+                                    {task.description ?? "No description provided."}
+                                </p>
                             )}
                         </div>
                     </SectionCard>
@@ -308,13 +353,13 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                             {isEditing && form ? (
                                 <>
                                     <div className="mb-2 flex items-center justify-between text-[12px]">
-                                        <label htmlFor="task-progress" className="text-text-muted">
+                                        <label htmlFor="task-edit-progress" className="text-text-muted">
                                             Drag to update progress
                                         </label>
                                         <span className="font-medium tabular-nums text-text-primary">{form.progress}%</span>
                                     </div>
                                     <input
-                                        id="task-progress"
+                                        id="task-edit-progress"
                                         type="range"
                                         min={0}
                                         max={100}
@@ -351,10 +396,10 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
                 {/* Related Course, Related Notes, Attachments */}
                 <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
-                    <RelatedResources course={relatedCourse} relatedNotes={relatedNotes} />
+                    <RelatedResources course={relatedCourse} relatedNotes={relatedNotes} courses={courses} />
                 </motion.div>
 
-                {/* Footer actions — only shown while editing; "Edit Task" itself lives in the header */}
+                {/* Footer actions — shown only while editing */}
                 {isEditing && (
                     <motion.div
                         variants={fadeInUp}
@@ -366,19 +411,24 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                         <button
                             type="button"
                             onClick={handleCancel}
-                            className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-2.5 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-white/[0.05] hover:text-text-primary"
+                            disabled={saving}
+                            className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-2.5 text-[13px] font-semibold text-text-secondary transition-colors hover:bg-white/[0.05] hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <X className="h-3.5 w-3.5" />
                             Cancel
                         </button>
                         <button
                             type="button"
-                            onClick={handleSave}
-                            disabled={form?.title.trim() === ""}
+                            onClick={() => void handleSave()}
+                            disabled={form?.title.trim() === "" || saving}
                             className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none"
                         >
-                            <Save className="h-3.5 w-3.5" />
-                            Save Changes
+                            {saving ? (
+                                <span className="h-3.5 w-3.5 flex-shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                            ) : (
+                                <Save className="h-3.5 w-3.5" />
+                            )}
+                            {saving ? "Saving…" : "Save Changes"}
                         </button>
                     </motion.div>
                 )}

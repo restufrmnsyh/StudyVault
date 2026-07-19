@@ -2,14 +2,17 @@ import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import { ProgressBar } from "@/components/common";
 import { priorityLabel, priorityStyle } from "@/constants/priority";
+import { formatDateFromISO } from "@/data/planner";
 import { cn } from "@/lib/utils";
-import type { PlannerTask } from "@/types/planner";
+import type { PlannerTaskRecord } from "@/services/planner.service";
 
 interface TaskCardProps {
-    task: PlannerTask;
-    /** Full course name, resolved from task.courseCode by the page (courses.ts is the source of truth). */
+    task: PlannerTaskRecord;
+    /** Full course name, resolved from task.courseId by the page via useCourses(). */
     courseName?: string;
-    onToggleComplete: (id: string) => void;
+    /** When omitted the completion checkbox is rendered as disabled — Supabase-backed
+     *  toggle is a follow-up sprint; see Sprint 6.7.1 out-of-scope notes. */
+    onToggleComplete?: (id: string) => void;
 }
 
 const cardVariant = {
@@ -34,16 +37,18 @@ export function TaskCard({ task, courseName, onToggleComplete }: TaskCardProps) 
             <button
                 type="button"
                 onClick={(e) => {
-                    // Stop this click from bubbling to the parent <a> and navigating away —
-                    // completing a task should happen in place, right from the task list.
                     e.preventDefault();
                     e.stopPropagation();
-                    onToggleComplete(task.id);
+                    onToggleComplete?.(task.id);
                 }}
-                aria-label={task.completed ? `Mark "${task.title}" as not completed` : `Mark "${task.title}" as completed`}
+                disabled={!onToggleComplete}
+                aria-label={
+                    task.completed ? `Mark "${task.title}" as not completed` : `Mark "${task.title}" as completed`
+                }
                 aria-pressed={task.completed}
                 className={cn(
                     "mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border transition-colors duration-200 sm:mt-0",
+                    !onToggleComplete && "cursor-not-allowed opacity-40",
                     task.completed ? "border-violet-500 bg-violet-500" : "border-zinc-700 hover:border-violet-500/60",
                 )}
             >
@@ -66,8 +71,9 @@ export function TaskCard({ task, courseName, onToggleComplete }: TaskCardProps) 
                 </div>
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-text-muted">
-                    <span>{courseName ?? task.courseCode}</span>
-                    <span>Due {task.dueDate}</span>
+                    <span>{courseName ?? task.courseId}</span>
+                    {/* task.dueDate is an ISO string (YYYY-MM-DD) — format for display */}
+                    <span>Due {formatDateFromISO(task.dueDate)}</span>
                 </div>
 
                 <div className="mt-3 flex items-center gap-2.5">
