@@ -200,3 +200,40 @@ export function recommendCourse(
     // Rule 4: First available course
     return courses[0];
 }
+
+/**
+ * Sprint 6.5.6 — Derives a human-readable reason string explaining why a course
+ * was recommended by recommendCourse(). Mirrors the same 4-rule priority order
+ * without changing recommendCourse()'s return type.
+ *
+ * @param course    - The already-recommended course
+ * @param notes     - All user notes (sorted by created_at DESC)
+ * @param materials - All user materials (sorted by created_at DESC)
+ * @param tasks     - All user planner tasks (sorted by due_date ASC)
+ * @returns Human-readable reason string
+ */
+export function getRecommendationReason(
+    course: Course,
+    notes: NoteRecord[],
+    materials: MaterialRecord[],
+    tasks: PlannerTaskRecord[]
+): string {
+    // Rule 1: Course with nearest active task
+    const activeTasks = tasks.filter((t) => !t.completed);
+    if (activeTasks.length > 0 && activeTasks[0].courseId === course.id) {
+        return "Has an upcoming task";
+    }
+
+    // Rule 2: Course with most recent note
+    if (notes.length > 0 && notes[0].courseId === course.id) {
+        return "Recent note activity";
+    }
+
+    // Rule 3: Course with most recent material
+    if (materials.length > 0 && materials[0].courseId === course.id) {
+        return "Recent material upload";
+    }
+
+    // Rule 4: First available course (fallback)
+    return "Get started";
+}
