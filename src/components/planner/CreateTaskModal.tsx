@@ -9,11 +9,14 @@ import type { CreatePlannerTaskInput, PlannerTaskRecord } from "@/services/plann
 interface CreateTaskModalProps {
     open: boolean;
     onClose: () => void;
-    /** Passed from PlannerPage — sourced from usePlanner().createTask so the list
-     *  updates optimistically without a second source of truth. */
+    /** Passed from the parent — sourced from the appropriate createTask hook method. */
     onCreate: (input: CreatePlannerTaskInput) => Promise<PlannerTaskRecord>;
-    /** Passed from PlannerPage — sourced from useCourses().data (Supabase). */
+    /** Course list for the course selector dropdown. Pass `[course]` from CourseDetailPage
+     *  to limit the dropdown to one option and avoid re-selection. */
     courses: Course[];
+    /** When set, pre-populates the courseId field and keeps it locked to this course.
+     *  Mirrors the same prop on CreateNoteModal — see CourseDetailPage usage. */
+    defaultCourseId?: string;
 }
 
 const INITIAL_VALUES: TaskFormValues = {
@@ -32,23 +35,24 @@ function validate(values: TaskFormValues): TaskFormErrors {
     return errors;
 }
 
-export function CreateTaskModal({ open, onClose, onCreate, courses }: CreateTaskModalProps) {
+export function CreateTaskModal({ open, onClose, onCreate, courses, defaultCourseId }: CreateTaskModalProps) {
     const { showToast } = useToast();
     const [values, setValues] = useState<TaskFormValues>(INITIAL_VALUES);
     const [errors, setErrors] = useState<TaskFormErrors>({});
     const [submitting, setSubmitting] = useState(false);
 
-    // Reset form state whenever the modal opens — mirrors CreateNoteModal's pattern
-    // of deferring the reset by one tick so exit animations don't see a blank form.
+    // Reset form state whenever the modal opens (or defaultCourseId changes) — mirrors
+    // CreateNoteModal's pattern of deferring the reset by one tick so exit animations
+    // don't see a blank form mid-transition.
     useEffect(() => {
         if (open) {
             const timer = setTimeout(() => {
-                setValues(INITIAL_VALUES);
+                setValues({ ...INITIAL_VALUES, courseId: defaultCourseId ?? "" });
                 setErrors({});
             }, 0);
             return () => clearTimeout(timer);
         }
-    }, [open]);
+    }, [open, defaultCourseId]);
 
     function handleClose() {
         if (submitting) return;

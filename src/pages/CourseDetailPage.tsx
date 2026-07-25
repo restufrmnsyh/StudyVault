@@ -13,6 +13,7 @@ import {
     FilePlus,
     FileText,
     Layers,
+    ListTodo,
     Loader2,
     Pencil,
     PlayCircle,
@@ -33,12 +34,14 @@ import { priorityStyle, priorityLabel } from "@/constants/priority";
 import { useCourse } from "@/hooks/queries/useCourse";
 import { useNotes } from "@/hooks/queries/useNotes";
 import { useMaterials } from "@/hooks/queries/useMaterials";
+import { usePlannerByCourse } from "@/hooks/queries/usePlannerByCourse";
 import { useToast } from "@/hooks/useToast";
 import type { CourseMaterial, CourseNote, CourseAssignment, CourseActivity } from "@/types/courses";
 import { cn } from "@/lib/utils";
 import { getMaterialType, formatBytes, canPreviewInBrowser } from "@/services/material.service";
 import type { MaterialRecord } from "@/services/material.service";
 import { getNotesByCourse, type NoteRecord } from "@/services/note.service";
+import { CreateTaskModal, TaskCard } from "@/components/planner";
 
 function formatRelativeTime(dateString: string): string {
     const date = new Date(dateString);
@@ -167,11 +170,13 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         uploadMaterial, updateMaterial: updateMaterialHook,
         replaceMaterialFile: replaceMaterialFileHook, deleteMaterial: deleteMaterialHook,
     } = useMaterials(courseId);
+    const { data: courseTasks, loading: tasksLoading, createTask, toggleComplete } = usePlannerByCourse(courseId);
     const { showToast } = useToast();
     const [editOpen, setEditOpen] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [createNoteOpen, setCreateNoteOpen] = useState(false);
+    const [createTaskOpen, setCreateTaskOpen] = useState(false);
     const [uploadModalOpen, setUploadModalOpen] = useState(false);
     const [previewMaterial, setPreviewMaterial] = useState<CourseMaterial | null>(null);
 
@@ -218,7 +223,7 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
         };
     }, [courseId]);
 
-    const pageLoading = loading || materialsLoading || notesLoading;
+    const pageLoading = loading || materialsLoading || notesLoading || tasksLoading;
 
     const materials: CourseMaterial[] = useMemo(() => {
         return materialsRecord.map((m) => ({
@@ -612,6 +617,34 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                     </SectionCard>
                 </motion.div>
 
+                {/* Tasks */}
+                <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
+                    <SectionCard
+                        icon={ListTodo}
+                        title="Tasks"
+                        action={{ label: "+ Add Task", onClick: () => setCreateTaskOpen(true) }}
+                    >
+                        {courseTasks.length > 0 ? (
+                            <div className="divide-y divide-zinc-800/60 px-4 py-3 sm:px-5">
+                                {courseTasks.map((task) => (
+                                    <TaskCard
+                                        key={task.id}
+                                        task={task}
+                                        courseName={course!.name}
+                                        onToggleComplete={toggleComplete}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                icon={ListTodo}
+                                title="No tasks yet"
+                                description="Tasks for this course will appear here."
+                            />
+                        )}
+                    </SectionCard>
+                </motion.div>
+
                 {/* Upcoming Assignments + Recent Activity */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
@@ -744,6 +777,16 @@ export function CourseDetailPage({ courseId }: CourseDetailPageProps) {
                 loading={deletingMaterial}
                 onConfirm={handleDeleteMaterialConfirmed}
                 onCancel={() => setDeleteMaterialTarget(null)}
+            />
+
+            {/* CreateTaskModal — courses is limited to [course] so the selector has only one option.
+                defaultCourseId pre-selects it, matching the CreateNoteModal pattern above. */}
+            <CreateTaskModal
+                open={createTaskOpen}
+                onClose={() => setCreateTaskOpen(false)}
+                defaultCourseId={courseId}
+                courses={[course]}
+                onCreate={createTask}
             />
         </DashboardLayout>
     );

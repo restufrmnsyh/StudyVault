@@ -104,8 +104,8 @@ export function usePlannerTask(id: string): UsePlannerTaskResult {
 
         try {
             await toggleChecklistItemDone(itemId, newDone);
-        } catch {
-            // Revert on failure
+        } catch (err) {
+            // Revert on failure, then surface the error so the caller can show a toast.
             setData((prev) => {
                 if (!prev) return prev;
                 return {
@@ -113,6 +113,7 @@ export function usePlannerTask(id: string): UsePlannerTaskResult {
                     checklist: prev.checklist.map((i) => (i.id === itemId ? { ...i, done: !newDone } : i)),
                 };
             });
+            throw err;
         }
     }, []);
 

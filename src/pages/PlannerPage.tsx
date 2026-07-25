@@ -51,7 +51,7 @@ function taskMatchesQuerySupabase(task: PlannerTaskRecord, query: string, course
 }
 
 export function PlannerPage() {
-    const { data: tasks, loading, error, createTask } = usePlanner();
+    const { data: tasks, loading, error, createTask, toggleComplete } = usePlanner();
     const { data: courses } = useCourses();
 
     const [search, setSearch] = useState("");
@@ -251,7 +251,7 @@ export function PlannerPage() {
                                 key={task.id}
                                 task={task}
                                 courseName={courses.find((c) => c.id === task.courseId)?.name}
-                                // onToggleComplete omitted — Supabase-backed toggle is a follow-up sprint
+                                onToggleComplete={toggleComplete}
                             />
                         ))}
                     </motion.div>

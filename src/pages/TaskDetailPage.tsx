@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { AlignLeft, ArrowLeft, ListTodo, Loader2, Pencil, Save, TrendingUp, X } from "lucide-react";
+import { AlignLeft, ArrowLeft, CheckCircle2, Circle, ListTodo, Loader2, Pencil, Save, TrendingUp, X } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
 import { SectionCard, ProgressBar, ConfirmDialog } from "@/components/common";
 import { TaskDetailHeader, ChecklistSection, RelatedResources } from "@/components/planner";
@@ -170,11 +170,16 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
 
     // View-mode toggle dispatches to Supabase via usePlannerTask (optimistic).
     // Edit-mode toggle mutates the local draft so Cancel can revert structural edits.
-    function toggleChecklistItemHandler(id: string) {
+    // The hook re-throws on Supabase failure so we can surface a toast here.
+    async function toggleChecklistItemHandler(id: string) {
         if (isEditing && draftChecklist) {
             setDraftChecklist((prev) => prev!.map((item) => (item.id === id ? { ...item, done: !item.done } : item)));
         } else {
-            void toggleChecklistItem(id);
+            try {
+                await toggleChecklistItem(id);
+            } catch {
+                showToast("Failed to update checklist item.", "error");
+            }
         }
     }
 
@@ -280,41 +285,45 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                     ) : (
                         <>
                             <TaskDetailHeader task={task} courseName={relatedCourse?.name} />
-                            <button
-                                type="button"
-                                onClick={startEdit}
-                                className="
-        mt-4
-        flex
-        w-full
-        items-center
-        justify-center
-        gap-2
-        rounded-xl
-        border
-        border-white/[0.06]
-        bg-white/[0.02]
-        px-4
-        py-2.5
-        text-[13px]
-        font-medium
-        text-text-muted
-        transition-colors
-        hover:border-violet-500/30
-        hover:text-violet-400
 
-        lg:absolute
-        lg:top-6
-        lg:right-6
-        lg:mt-0
-        lg:w-auto
-        lg:px-3
-        lg:py-2
-"
-                            >
-                                <Pencil className="h-3.5 w-3.5" />
-                                Edit Task
-                            </button>
+                            {/* Action row — Edit Task and Mark Complete/Incomplete side by side on desktop */}
+                            <div className="mt-4 flex flex-col gap-2 sm:flex-row lg:absolute lg:right-6 lg:top-6 lg:mt-0 lg:flex-row">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        void updateTask({ completed: !task.completed })
+                                            .then(() => showToast(task.completed ? "Task marked as incomplete." : "Task marked as complete."))
+                                            .catch(() => showToast("Failed to update task.", "error"))
+                                    }
+                                    className={cn(
+                                        "flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-[13px] font-medium transition-colors",
+                                        task.completed
+                                            ? "border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20"
+                                            : "border-white/[0.06] bg-white/[0.02] text-text-muted hover:border-emerald-500/30 hover:text-emerald-400",
+                                    )}
+                                >
+                                    {task.completed ? (
+                                        <>
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                            Completed
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Circle className="h-3.5 w-3.5" />
+                                            Mark Complete
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={startEdit}
+                                    className="flex items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[13px] font-medium text-text-muted transition-colors hover:border-violet-500/30 hover:text-violet-400"
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit Task
+                                </button>
+                            </div>
                         </>
                     )}
                 </motion.div>
