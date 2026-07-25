@@ -1,36 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    getPlannerTasks,
+    getPlannerTasksByCourse,
     createPlannerTask,
     updatePlannerTask,
     type PlannerTaskRecord,
     type CreatePlannerTaskInput,
 } from "@/services/planner.service";
 
-export interface UsePlannerResult {
+export interface UsePlannerByCourseResult {
     data: PlannerTaskRecord[];
     loading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
-    /** Creates a task via Supabase and appends it to the list sorted by due date.
-     *  Throws on failure so the caller (CreateTaskModal) can surface an error toast. */
+    /** Creates a task via Supabase and appends it to the local list, sorted by due date.
+     *  The caller (CourseDetailPage) passes `courseId` via the input — no second query. */
     createTask: (input: CreatePlannerTaskInput) => Promise<PlannerTaskRecord>;
     /** Optimistically flips a task's `completed` flag, persists to Supabase, reverts on
-     *  error. Used by TaskCard's checkbox in PlannerPage. */
+     *  error. Used by TaskCard's checkbox in CourseDetailPage. */
     toggleComplete: (taskId: string) => Promise<void>;
 }
 
 /**
- * Loads every planner task (with checklist) owned by the signed-in user, from Supabase.
+ * Loads every planner task for a single course, with its checklist embedded.
  *
- * NOTE: `hooks/usePlanner.ts` already exists — it reads the Planner module's local,
- * localStorage-backed demo store (edit/checklist/completion, no backend). Same naming
- * situation as `hooks/queries/useNotes.ts` — see that file's note for why this isn't
- * renamed instead. Import the one you mean explicitly:
- *   import { usePlanner } from "@/hooks/usePlanner";          // local demo store
- *   import { usePlanner } from "@/hooks/queries/usePlanner";  // Supabase-backed
+ * Mirrors the shape of usePlanner() but scopes the Supabase query to one course_id,
+ * so CourseDetailPage never fetches the full task list. Follows the same local-state
+ * pattern used by useMaterials(courseId) in the materials query hook.
+ *
+ * The usePlanner() hook (all-tasks view used by PlannerPage) is a separate instance —
+ * creating a task here does NOT update usePlanner's cache. usePlanner re-fetches on
+ * next mount, which is the correct behaviour (same as notes: useNotes doesn't know
+ * about notes created by createNote() in CourseDetailPage).
  */
-export function usePlanner(): UsePlannerResult {
+export function usePlannerByCourse(courseId: string): UsePlannerByCourseResult {
     const [data, setData] = useState<PlannerTaskRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -47,25 +49,25 @@ export function usePlanner(): UsePlannerResult {
         setLoading(true);
         setError(null);
         try {
-            setData(await getPlannerTasks());
+            setData(await getPlannerTasksByCourse(courseId));
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to load planner tasks.");
+            setError(err instanceof Error ? err.message : "Failed to load tasks.");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [courseId]);
 
-    // See hooks/queries/useCourses.ts for why the initial load is a separate promise
-    // chain rather than just calling refresh() here.
+    // Initial load — separate promise chain so the effect cleanup flag works correctly.
+    // See hooks/queries/useCourses.ts for the rationale behind this pattern.
     useEffect(() => {
         let active = true;
 
-        getPlannerTasks()
+        getPlannerTasksByCourse(courseId)
             .then((result) => {
                 if (active) setData(result);
             })
             .catch((err) => {
-                if (active) setError(err instanceof Error ? err.message : "Failed to load planner tasks.");
+                if (active) setError(err instanceof Error ? err.message : "Failed to load tasks.");
             })
             .finally(() => {
                 if (active) setLoading(false);
@@ -74,20 +76,19 @@ export function usePlanner(): UsePlannerResult {
         return () => {
             active = false;
         };
-    }, []);
+    }, [courseId]);
 
-    const createTask = useCallback(async (input: CreatePlannerTaskInput): Promise<PlannerTaskRecord> => {
-        const record = await createPlannerTask(input);
-        // Optimistic-append, sorted by due date ascending — same convention as getPlannerTasks().
-        setData((prev) => [...prev, record].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
-        return record;
-    }, []);
+    const createTask = useCallback(
+        async (input: CreatePlannerTaskInput): Promise<PlannerTaskRecord> => {
+            const record = await createPlannerTask(input);
+            // Optimistic-append, sorted by due date — mirrors usePlanner.createTask.
+            setData((prev) => [...prev, record].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
+            return record;
+        },
+        [],
+    );
 
     const toggleComplete = useCallback(async (taskId: string): Promise<void> => {
-        // Read the current task state from the ref (always up-to-date after each render).
-        // This avoids the unreliable setState-updater side-effect pattern where React
-        // may not call the updater synchronously, causing previousCompleted to remain
-        // undefined and updatePlannerTask to be skipped entirely.
         const task = dataRef.current.find((t) => t.id === taskId);
         if (!task) return;
 

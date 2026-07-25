@@ -98,6 +98,21 @@ export async function getPlannerTasks(): Promise<PlannerTaskRecord[]> {
     return (data ?? []).map(mapPlannerTask);
 }
 
+/** Same as getPlannerTasks but scoped to a single course.
+ *  Used by usePlannerByCourse — calling code should prefer the hook over this function. */
+export async function getPlannerTasksByCourse(courseId: string): Promise<PlannerTaskRecord[]> {
+    const { data, error } = await supabase
+        .from("planner_tasks")
+        .select(TASK_SELECT_WITH_CHECKLIST)
+        .eq("course_id", courseId)
+        .order("due_date", { ascending: true })
+        .order("position", { referencedTable: "task_checklist", ascending: true })
+        .returns<PlannerTaskRow[]>();
+
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(mapPlannerTask);
+}
+
 /** Fetches a single planner task by id, checklist included. Returns null if it
  *  doesn't exist or isn't owned by the signed-in user. */
 export async function getPlannerTaskById(id: string): Promise<PlannerTaskRecord | null> {
