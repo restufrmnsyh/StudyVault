@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
     Archive,
@@ -9,6 +9,7 @@ import {
     Copy,
     FileText,
     Layers,
+    ListTodo,
     MoreHorizontal,
     Pencil,
     Save,
@@ -19,13 +20,20 @@ import {
     AlertTriangle,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { SectionCard, EmptyState, ConfirmDialog, RelatedCourseCard } from "@/components/common";
+import { SectionCard, EmptyState, ConfirmDialog, RelatedCourseCard, ListRow } from "@/components/common";
 import { NoteContentBlocks } from "@/components/notes";
+import { TaskCard } from "@/components/planner";
+import { MaterialPreviewModal } from "@/components/courses";
 import { useNote } from "@/hooks/queries/useNote";
+import { useMaterials } from "@/hooks/queries/useMaterials";
+import { usePlannerByCourse } from "@/hooks/queries/usePlannerByCourse";
 import { getCourseById, toCourse } from "@/services/course.service";
+import { getMaterialType, formatBytes, canPreviewInBrowser } from "@/services/material.service";
+import type { MaterialRecord } from "@/services/material.service";
 import { useToast } from "@/hooks/useToast";
+import { materialIcon, materialTypeLabel } from "@/constants/materialIcons";
 import type { NoteContentBlock } from "@/types/notes";
-import type { Course } from "@/types/courses";
+import type { Course, CourseMaterial } from "@/types/courses";
 import type { NoteRecord } from "@/services/note.service";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +60,10 @@ const fadeInUp = {
 
 const fieldClassName =
     "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-text-primary outline-none ring-violet-500/15 transition-all duration-200 placeholder:text-text-muted focus:border-violet-500/30 focus:bg-white/[0.04] focus:ring-4";
+
+/** Maximum number of tasks / materials shown inline in Note Detail.
+ *  If more exist, a "View All" link navigates to the full Course Detail page. */
+const PREVIEW_LIMIT = 5;
 
 function noteContentToPlainText(blocks: NoteContentBlock[]): string {
     return blocks
@@ -172,6 +184,16 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [relatedCourse, setRelatedCourse] = useState<Course | null>(null);
+    const [previewMaterial, setPreviewMaterial] = useState<CourseMaterial | null>(null);
+
+    // Knowledge graph — fetch materials and tasks that share this note's course.
+    // Hooks are called unconditionally (React rule); each hook's empty-string courseId
+    // guard prevents spurious queries while the note is still loading.
+    const courseId = note?.courseId ?? "";
+    const { data: courseMaterials } = useMaterials(courseId);
+    const { data: allCourseTasks } = usePlannerByCourse(courseId);
+    // Only surface incomplete tasks — completed tasks clutter the actionable list.
+    const activeTasks = useMemo(() => allCourseTasks.filter((t) => !t.completed), [allCourseTasks]);
 
     useEffect(() => {
         if (!note?.courseId) return;
@@ -321,6 +343,28 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
         } catch (err) {
             showToast(err instanceof Error ? err.message : "Failed to delete note", "error");
             setDeleting(false);
+        }
+    }
+
+    /** Opens the in-browser preview for PDF/image materials; falls back to a new
+     *  tab for all other types (video, zip, doc…). Mirrors CourseDetailPage behaviour. */
+    function handleMaterialClick(m: MaterialRecord) {
+        const type = getMaterialType(m.mimeType, m.fileName);
+        if (canPreviewInBrowser(type)) {
+            setPreviewMaterial({
+                id: m.id,
+                name: m.title,
+                type,
+                size: formatBytes(m.fileSize),
+                updatedAt: m.updatedAt,
+                fileUrl: m.fileUrl,
+                mimeType: m.mimeType,
+                description: m.description,
+                fileName: m.fileName,
+                fileSize: m.fileSize,
+            });
+        } else if (m.fileUrl) {
+            window.open(m.fileUrl, "_blank", "noopener,noreferrer");
         }
     }
 
@@ -474,7 +518,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                     </SectionCard>
                 </motion.div>
 
-                {/* Related course */}
+                {/* Related Course */}
                 {relatedCourse && (
                     <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.15 }}>
                         <div className="mb-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-text-muted">
@@ -484,28 +528,82 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                     </motion.div>
                 )}
 
-                {/* Related Materials + Recent Activity */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
-                        <SectionCard icon={Layers} title="Related Materials">
+                {/* Related Tasks — active (incomplete) tasks from the same course.
+                     Displayed before materials: tasks are more immediately actionable
+                     after reading a note. */}
+                <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
+                    <SectionCard
+                        icon={ListTodo}
+                        title="Related Tasks"
+                        action={
+                            activeTasks.length > PREVIEW_LIMIT
+                                ? {
+                                      label: "View All",
+                                      onClick: () => { window.location.hash = `#/dashboard/courses/${courseId}`; },
+                                  }
+                                : undefined
+                        }
+                    >
+                        {activeTasks.length > 0 ? (
+                            <div className="divide-y divide-zinc-800/60 px-4 py-3 sm:px-5">
+                                {activeTasks.slice(0, PREVIEW_LIMIT).map((task) => (
+                                    <TaskCard
+                                        key={task.id}
+                                        task={task}
+                                        courseName={relatedCourse?.name}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState
+                                icon={ListTodo}
+                                title="No active tasks"
+                                description="Active tasks for this course will appear here."
+                            />
+                        )}
+                    </SectionCard>
+                </motion.div>
+
+                {/* Related Materials — all materials from the same course.
+                     Clicking opens the in-browser preview modal for PDF/image;
+                     other types open in a new tab. */}
+                <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
+                    <SectionCard
+                        icon={Layers}
+                        title="Related Materials"
+                        action={
+                            courseMaterials.length > PREVIEW_LIMIT
+                                ? {
+                                      label: "View All",
+                                      onClick: () => { window.location.hash = `#/dashboard/courses/${courseId}`; },
+                                  }
+                                : undefined
+                        }
+                    >
+                        {courseMaterials.length > 0 ? (
+                            <div className="divide-y divide-zinc-800/60">
+                                {courseMaterials.slice(0, PREVIEW_LIMIT).map((m) => {
+                                    const type = getMaterialType(m.mimeType, m.fileName);
+                                    return (
+                                        <ListRow
+                                            key={m.id}
+                                            icon={materialIcon[type]}
+                                            title={m.title}
+                                            subtitle={`${materialTypeLabel[type]} · ${formatBytes(m.fileSize)}`}
+                                            onClick={() => handleMaterialClick(m)}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ) : (
                             <EmptyState
                                 icon={Layers}
                                 title="No related materials"
-                                description="Files attached to this note will show up here."
+                                description="Materials for this course will appear here."
                             />
-                        </SectionCard>
-                    </motion.div>
-
-                    <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
-                        <SectionCard icon={Clock} title="Recent Activity">
-                            <EmptyState
-                                icon={Clock}
-                                title="No activity yet"
-                                description="Actions on this note will show up here."
-                            />
-                        </SectionCard>
-                    </motion.div>
-                </div>
+                        )}
+                    </SectionCard>
+                </motion.div>
 
                 {/* Footer actions */}
                 <motion.div
@@ -557,6 +655,8 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                     )}
                 </motion.div>
             </div>
+
+            <MaterialPreviewModal material={previewMaterial} onClose={() => setPreviewMaterial(null)} />
 
             <ConfirmDialog
                 open={showDiscardConfirm}
