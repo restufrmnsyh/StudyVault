@@ -47,6 +47,27 @@ const activityIcon: Record<ActivityType, LucideIcon> = {
     "completed-task": CheckCircle2,
 };
 
+/**
+ * Derives the navigation destination for an activity row.
+ * - created-note  → NoteDetailPage
+ * - completed-task → TaskDetailPage
+ * - uploaded-material → CourseDetailPage (no standalone material page yet)
+ *
+ * ActivityItem.id is prefixed: "note-{uuid}", "material-{uuid}", "task-{uuid}".
+ */
+function getActivityHref(activity: ActivityItem, materials: MaterialRecord[]): string | undefined {
+    if (activity.type === "created-note") {
+        return `#/dashboard/notes/${activity.id.slice("note-".length)}`;
+    }
+    if (activity.type === "completed-task") {
+        return `#/dashboard/planner/${activity.id.slice("task-".length)}`;
+    }
+    // uploaded-material: look up courseId and navigate to Course Detail
+    const materialId = activity.id.slice("material-".length);
+    const material = materials.find((m) => m.id === materialId);
+    return material ? `#/dashboard/courses/${material.courseId}` : undefined;
+}
+
 export function RecentActivity({ notes, materials, tasks, courses, loading }: RecentActivityProps) {
     // Aggregate activities from all sources
     const activities = aggregateActivities(notes, materials, tasks, courses, 4);
@@ -76,6 +97,10 @@ export function RecentActivity({ notes, materials, tasks, courses, loading }: Re
                                     title={activity.title}
                                     subtitle={activity.subtitle}
                                     trailing={activity.trailing}
+                                    onClick={() => {
+                                        const href = getActivityHref(activity, materials);
+                                        if (href) { window.location.hash = href; }
+                                    }}
                                 />
                             </motion.div>
                         ))}
