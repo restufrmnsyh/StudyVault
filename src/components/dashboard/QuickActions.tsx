@@ -53,6 +53,10 @@ export function QuickActions({ onCreateCourse, onCreateNote }: { onCreateCourse:
                             ? onCreateCourse
                             : action.label === "Create Note"
                             ? onCreateNote
+                            : action.label === "Open Planner"
+                            ? () => { window.location.hash = "#/dashboard/planner"; }
+                            : action.label === "Upload Material"
+                            ? () => { window.location.hash = "#/dashboard/courses"; }
                             : undefined
                     }
                     variants={cardVariant}

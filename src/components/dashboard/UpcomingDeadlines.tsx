@@ -49,6 +49,7 @@ export function UpcomingDeadlines({ tasks, loading, courses }: UpcomingDeadlines
                                 title={task.title}
                                 subtitle={getCourseName(task.courseId)}
                                 trailing={formatDueDate(task.dueDate)}
+                                onClick={() => { window.location.hash = `#/dashboard/planner/${task.id}`; }}
                             />
                         ))}
                     </div>

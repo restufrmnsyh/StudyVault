@@ -54,6 +54,7 @@ export function TodaysFocus({ tasks, loading, courses }: TodaysFocusProps) {
                                 title={task.title}
                                 subtitle={getCourseName(task.courseId)}
                                 trailing={formatDueDate(task.dueDate)}
+                                onClick={() => { window.location.hash = `#/dashboard/planner/${task.id}`; }}
                             />
                         ))}
                     </div>

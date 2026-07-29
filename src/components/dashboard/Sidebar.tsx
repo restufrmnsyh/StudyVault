@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { GraduationCap, ChevronsLeft, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sidebarItems, currentUser } from "@/data/dashboard";
+import { useAuth } from "@/auth/useAuth";
 
 interface SidebarProps {
   currentPath: string;
@@ -12,6 +13,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarProps) {
+  const { signOut } = useAuth();
+
   const handleNavClick = useCallback(
     (href: string) => {
       window.location.hash = href.replace("#", "");
@@ -20,10 +23,11 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
     [onClose],
   );
 
-  const handleBackToSite = useCallback(() => {
+  const handleBackToSite = useCallback(async () => {
+    await signOut();
     window.location.hash = "";
     onClose?.();
-  }, [onClose]);
+  }, [onClose, signOut]);
 
   return (
     <aside
@@ -119,10 +123,10 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
           )}
           {!collapsed && (
             <button
-              onClick={handleBackToSite}
+              onClick={() => void handleBackToSite()}
               className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary"
-              aria-label="Back to site"
-              title="Back to site"
+              aria-label="Sign out"
+              title="Sign out"
             >
               <LogOut className="h-3 w-3" />
             </button>

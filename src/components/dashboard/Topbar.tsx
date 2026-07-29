@@ -1,14 +1,17 @@
 import { Search, Bell, Menu, GraduationCap, ArrowLeftToLine } from "lucide-react";
 import { currentUser, notifications } from "@/data/dashboard";
+import { useAuth } from "@/auth/useAuth";
 
 interface TopbarProps {
   onMenuToggle: () => void;
 }
 
 export function Topbar({ onMenuToggle }: TopbarProps) {
+  const { signOut } = useAuth();
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  function handleBackToSite() {
+  async function handleBackToSite() {
+    await signOut();
     window.location.hash = "";
   }
 
@@ -50,10 +53,10 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
       <div className="flex items-center gap-2">
         {/* Back to site (mobile only \u2014 desktop uses the sidebar button) */}
         <button
-          onClick={handleBackToSite}
+          onClick={() => void handleBackToSite()}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary md:hidden"
-          aria-label="Back to site"
-          title="Back to site"
+          aria-label="Sign out"
+          title="Sign out"
         >
           <ArrowLeftToLine className="h-4 w-4" />
         </button>
