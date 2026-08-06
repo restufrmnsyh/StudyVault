@@ -4,7 +4,7 @@ import {
   BookOpen,
   FileText,
   Calendar,
-  MoreHorizontal,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +17,7 @@ const mobileItems = [
   { icon: BookOpen, label: "Courses", href: "/dashboard/courses" },
   { icon: FileText, label: "Notes", href: "/dashboard/notes" },
   { icon: Calendar, label: "Planner", href: "/dashboard/planner" },
-  { icon: MoreHorizontal, label: "More", href: "/dashboard/settings" },
+  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
 export function MobileNav({ currentPath }: MobileNavProps) {
