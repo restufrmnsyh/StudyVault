@@ -7,6 +7,7 @@ import { NotesPage } from "@/pages/NotesPage";
 import { NoteDetailPage } from "@/pages/NoteDetailPage";
 import { PlannerPage } from "@/pages/PlannerPage";
 import { TaskDetailPage } from "@/pages/TaskDetailPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
@@ -104,6 +105,14 @@ function Router() {
     return (
       <ProtectedRoute>
         <PlannerPage />
+      </ProtectedRoute>
+    );
+  }
+
+  if (hash.startsWith("#/dashboard/settings")) {
+    return (
+      <ProtectedRoute>
+        <SettingsPage />
       </ProtectedRoute>
     );
   }

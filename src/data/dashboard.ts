@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileText,
   Calendar,
+  Settings,
   BookMarked,
   Clock,
   Flame,
@@ -14,6 +15,7 @@ export const sidebarItems: SidebarItem[] = [
   { icon: BookOpen, label: "Courses", href: "#/dashboard/courses" },
   { icon: FileText, label: "Notes", href: "#/dashboard/notes" },
   { icon: Calendar, label: "Planner", href: "#/dashboard/planner" },
+  { icon: Settings, label: "Settings", href: "#/dashboard/settings" },
 ];
 
 export const currentUser: UserProfile = {

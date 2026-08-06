@@ -76,3 +76,55 @@ export async function getProfile(): Promise<ProfileRecord | null> {
 
     return data ? mapProfile(data) : null;
 }
+
+/** Input shape for updating profile fields. All fields are optional. */
+export interface UpdateProfileInput {
+    fullName?: string | null;
+    university?: string | null;
+    faculty?: string | null;
+    major?: string | null;
+    semester?: number | null;
+}
+
+/**
+ * Updates the signed-in user's profile with the provided fields.
+ * Only provided fields are updated; others remain unchanged.
+ * Returns the updated profile record.
+ */
+export async function updateProfile(input: UpdateProfileInput): Promise<ProfileRecord> {
+    const {
+        data: { user },
+        error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+        throw new Error(authError.message);
+    }
+    if (!user) {
+        throw new Error("No authenticated user");
+    }
+
+    // Map camelCase input to snake_case for Postgres
+    const updateData: Partial<Omit<ProfileRow, "id" | "created_at" | "updated_at">> = {};
+    if (input.fullName !== undefined) updateData.full_name = input.fullName;
+    if (input.university !== undefined) updateData.university = input.university;
+    if (input.faculty !== undefined) updateData.faculty = input.faculty;
+    if (input.major !== undefined) updateData.major = input.major;
+    if (input.semester !== undefined) updateData.semester = input.semester;
+
+    const { data, error } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", user.id)
+        .select()
+        .single<ProfileRow>();
+
+    if (error) {
+        throw new Error(error.message);
+    }
+    if (!data) {
+        throw new Error("Failed to update profile");
+    }
+
+    return mapProfile(data);
+}
