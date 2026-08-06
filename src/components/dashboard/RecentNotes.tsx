@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { FileText } from "lucide-react";
-import { SectionCard, ListRow } from "@/components/common";
+import { SectionCard, ListRow, EmptyState } from "@/components/common";
 import { useNotes } from "@/hooks/queries/useNotes";
 import { useCourses } from "@/hooks/queries/useCourses";
 import type { NoteRecord } from "@/services/note.service";
@@ -52,7 +52,7 @@ function formatRelativeTime(dateString: string): string {
   }
 }
 
-export function RecentNotes({ notes: propNotes, loading: propLoading }: { notes?: NoteRecord[]; loading?: boolean } = {}) {
+export function RecentNotes({ notes: propNotes, loading: propLoading, onCreateNote }: { notes?: NoteRecord[]; loading?: boolean; onCreateNote?: () => void } = {}) {
   const { data: notesQuery, loading: queryLoading } = useNotes();
   const { data: courses, loading: coursesLoading } = useCourses();
 
@@ -87,7 +87,12 @@ export function RecentNotes({ notes: propNotes, loading: propLoading }: { notes?
           {isLoading ? (
             <div className="px-5 py-4 text-[13px] text-text-muted">Loading...</div>
           ) : recentNotes.length === 0 ? (
-            <div className="px-5 py-4 text-[13px] text-text-muted">No recent notes</div>
+            <EmptyState
+              icon={FileText}
+              title="No recent notes"
+              description="Notes you create will appear here."
+              action={onCreateNote ? { label: "Create Note", onClick: onCreateNote } : undefined}
+            />
           ) : (
             recentNotes.map((note) => {
               const course = courses.find((c) => c.id === note.courseId);

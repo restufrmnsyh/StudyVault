@@ -12,6 +12,7 @@ import {
 } from "@/components/dashboard";
 import { CreateCourseModal } from "@/components/courses";
 import { CreateNoteModal } from "@/components/notes";
+import { CreateTaskModal } from "@/components/planner";
 import { useCourses } from "@/hooks/queries/useCourses";
 import { useNotes } from "@/hooks/queries/useNotes";
 import { useProfile } from "@/hooks/queries/useProfile";
@@ -25,10 +26,11 @@ export function DashboardPage() {
   const { data: courses, loading: coursesLoading, createCourse } = useCourses();
   const { data: notes, loading: notesLoading, createNote } = useNotes();
   const { data: profile } = useProfile();
-  const { data: tasks, loading: tasksLoading } = usePlanner();
+  const { data: tasks, loading: tasksLoading, createTask } = usePlanner();
   const { data: materials, loading: materialsLoading } = useAllMaterials();
   const [createCourseOpen, setCreateCourseOpen] = useState(false);
   const [createNoteOpen, setCreateNoteOpen] = useState(false);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
 
   return (
     <DashboardLayout>
@@ -53,8 +55,9 @@ export function DashboardPage() {
           materials={materials}
           tasks={tasks}
           loading={coursesLoading}
+          onCreateCourse={() => setCreateCourseOpen(true)}
         />
-        <UpcomingDeadlines tasks={tasks} loading={tasksLoading} courses={courses} />
+        <UpcomingDeadlines tasks={tasks} loading={tasksLoading} courses={courses} onCreateTask={() => setCreateTaskOpen(true)} />
         <RecentActivity
           notes={notes}
           materials={materials}
@@ -62,7 +65,7 @@ export function DashboardPage() {
           courses={courses}
           loading={notesLoading || materialsLoading || tasksLoading}
         />
-        <RecentNotes notes={notes} loading={notesLoading} />
+        <RecentNotes notes={notes} loading={notesLoading} onCreateNote={() => setCreateNoteOpen(true)} />
         <OverviewCards
           coursesCount={coursesLoading ? 0 : courses.length}
           notesCount={notesLoading ? 0 : notes.length}
@@ -82,6 +85,13 @@ export function DashboardPage() {
         onClose={() => setCreateNoteOpen(false)}
         courses={courses}
         onCreate={createNote}
+      />
+
+      <CreateTaskModal
+        open={createTaskOpen}
+        onClose={() => setCreateTaskOpen(false)}
+        onCreate={createTask}
+        courses={courses}
       />
     </DashboardLayout>
   );

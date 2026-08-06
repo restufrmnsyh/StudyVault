@@ -4,6 +4,7 @@ import { AlignLeft, ArrowLeft, CheckCircle2, Circle, ListTodo, Loader2, Pencil, 
 import { DashboardLayout } from "@/components/dashboard";
 import { SectionCard, ProgressBar, ConfirmDialog } from "@/components/common";
 import { TaskDetailHeader, ChecklistSection, RelatedResources } from "@/components/planner";
+import { CreateNoteModal } from "@/components/notes";
 import { usePlannerTask } from "@/hooks/queries/usePlannerTask";
 import { useCourses } from "@/hooks/queries/useCourses";
 import { useNotes } from "@/hooks/queries/useNotes";
@@ -51,7 +52,7 @@ function checklistEqual(a: ChecklistItemRecord[], b: ChecklistItemRecord[]): boo
 export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
     const { data: task, loading, error, refresh, updateTask, toggleChecklistItem } = usePlannerTask(taskId);
     const { data: courses } = useCourses();
-    const { data: allNotes } = useNotes();
+    const { data: allNotes, createNote } = useNotes();
     const { showToast } = useToast();
 
     const [mode, setMode] = useState<TaskDetailMode>("view");
@@ -59,6 +60,7 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
     const [draftChecklist, setDraftChecklist] = useState<ChecklistItemRecord[] | null>(null);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [createNoteOpen, setCreateNoteOpen] = useState(false);
 
     // ── Loading / not-found states ────────────────────────────────────────────
 
@@ -403,9 +405,14 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                     />
                 </motion.div>
 
-                {/* Related Course, Related Notes, Attachments */}
+                {/* Related Course, Related Notes */}
                 <motion.div variants={fadeInUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
-                    <RelatedResources course={relatedCourse} relatedNotes={relatedNotes} courses={courses} />
+                    <RelatedResources
+                        course={relatedCourse}
+                        relatedNotes={relatedNotes}
+                        courses={courses}
+                        onCreateNote={() => setCreateNoteOpen(true)}
+                    />
                 </motion.div>
 
                 {/* Footer actions — shown only while editing */}
@@ -452,6 +459,14 @@ export function TaskDetailPage({ taskId }: TaskDetailPageProps) {
                 destructive
                 onConfirm={exitEditMode}
                 onCancel={() => setShowDiscardConfirm(false)}
+            />
+
+            <CreateNoteModal
+                open={createNoteOpen}
+                onClose={() => setCreateNoteOpen(false)}
+                courses={relatedCourse ? [relatedCourse] : courses}
+                onCreate={createNote}
+                defaultCourseId={task.courseId}
             />
         </DashboardLayout>
     );

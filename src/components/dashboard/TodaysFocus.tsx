@@ -43,6 +43,7 @@ export function TodaysFocus({ tasks, loading, courses }: TodaysFocusProps) {
                             icon={Target}
                             title="No tasks today"
                             description="You're all caught up! Create a new task or check your planner."
+                            action={{ label: "Open Planner", onClick: () => { window.location.hash = "#/dashboard/planner"; } }}
                         />
                     </div>
                 ) : (

@@ -13,6 +13,7 @@ interface ContinueLearningProps {
     materials: MaterialRecord[];
     tasks: PlannerTaskRecord[];
     loading: boolean;
+    onCreateCourse?: () => void;
 }
 
 const fadeInUp = {
@@ -56,7 +57,7 @@ function ContinueLearningskeleton() {
     );
 }
 
-export function ContinueLearning({ courses, notes, materials, tasks, loading }: ContinueLearningProps) {
+export function ContinueLearning({ courses, notes, materials, tasks, loading, onCreateCourse }: ContinueLearningProps) {
     // Show skeleton while any of the required datasets is still loading
     if (loading) {
         return <ContinueLearningskeleton />;
@@ -79,6 +80,7 @@ export function ContinueLearning({ courses, notes, materials, tasks, loading }: 
                         icon={BookOpen}
                         title="No courses yet"
                         description="Create your first course to start learning."
+                        action={onCreateCourse ? { label: "Create Course", onClick: onCreateCourse } : undefined}
                     />
                 </div>
             </motion.div>

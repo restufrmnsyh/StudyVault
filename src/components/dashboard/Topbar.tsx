@@ -1,14 +1,33 @@
 import { Search, Bell, Menu, GraduationCap, ArrowLeftToLine } from "lucide-react";
-import { currentUser, notifications } from "@/data/dashboard";
 import { useAuth } from "@/auth/useAuth";
+import { useProfile } from "@/hooks/queries/useProfile";
 
 interface TopbarProps {
   onMenuToggle: () => void;
 }
 
 export function Topbar({ onMenuToggle }: TopbarProps) {
-  const { signOut } = useAuth();
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const { signOut, user } = useAuth();
+  const { data: profile } = useProfile();
+
+  // Derive display name and initials — mirrors Sidebar.tsx
+  let displayName = "Student";
+  if (profile?.fullName) {
+    displayName = profile.fullName;
+  } else if (user?.email) {
+    displayName = user.email
+      .split("@")[0]
+      .replace(/[._]/g, " ")
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+  const initials = (() => {
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  })();
 
   async function handleBackToSite() {
     await signOut();
@@ -72,22 +91,17 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
         {/* Notifications */}
         <button
           className="relative flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary"
-          aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : "Notifications"}
+          aria-label="Notifications"
         >
           <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500 text-[9px] font-bold text-white">
-              {unreadCount}
-            </span>
-          )}
         </button>
 
         {/* Avatar */}
         <button
           className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 text-[11px] font-bold text-white transition-shadow hover:shadow-md hover:shadow-violet-500/20"
-          aria-label={`${currentUser.name} account menu`}
+          aria-label={`${displayName} account menu`}
         >
-          {currentUser.initials}
+          {initials}
         </button>
       </div>
     </header>
