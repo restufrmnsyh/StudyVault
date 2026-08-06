@@ -9,6 +9,7 @@ interface UpcomingDeadlinesProps {
     tasks: PlannerTaskRecord[];
     loading: boolean;
     courses: Course[];
+    onCreateTask?: () => void;
 }
 
 const fadeInUp = {
@@ -20,7 +21,7 @@ const fadeInUp = {
     },
 };
 
-export function UpcomingDeadlines({ tasks, loading, courses }: UpcomingDeadlinesProps) {
+export function UpcomingDeadlines({ tasks, loading, courses, onCreateTask }: UpcomingDeadlinesProps) {
     // Select up to 5 upcoming incomplete tasks
     const deadlines = selectUpcomingDeadlines(tasks, 5);
 
@@ -39,6 +40,7 @@ export function UpcomingDeadlines({ tasks, loading, courses }: UpcomingDeadlines
                             icon={CalendarClock}
                             title="No upcoming deadlines"
                             description="You're all caught up! Create a new task to get started."
+                            action={onCreateTask ? { label: "Create Task", onClick: onCreateTask } : undefined}
                         />
                     </div>
                 ) : (

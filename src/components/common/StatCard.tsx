@@ -31,6 +31,8 @@ interface StatCardProps {
      * if both are set. Defaults to false.
      */
     compact?: boolean;
+    /** Optional click handler — also adds cursor-pointer when set. */
+    onClick?: () => void;
 }
 
 export function StatCard({
@@ -41,15 +43,18 @@ export function StatCard({
     trend,
     compactOnMobile = false,
     compact = false,
+    onClick,
 }: StatCardProps) {
     return (
         <motion.div
             variants={statCardVariant}
             whileHover={{ y: -4, transition: { duration: 0.25, ease: "easeOut" } }}
             whileTap={{ scale: 0.98 }}
+            onClick={onClick}
             className={cn(
                 "group rounded-2xl border border-zinc-800 bg-zinc-900 transition-colors duration-300 hover:border-violet-500/25 hover:shadow-lg hover:shadow-violet-500/[0.04]",
                 compact ? "p-3.5" : compactOnMobile ? "p-3 sm:p-5" : "p-5",
+                onClick && "cursor-pointer",
             )}
         >
             <div

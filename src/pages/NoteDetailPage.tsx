@@ -22,7 +22,7 @@ import {
 import { DashboardLayout } from "@/components/dashboard";
 import { SectionCard, EmptyState, ConfirmDialog, RelatedCourseCard, ListRow } from "@/components/common";
 import { NoteContentBlocks } from "@/components/notes";
-import { TaskCard } from "@/components/planner";
+import { TaskCard, CreateTaskModal } from "@/components/planner";
 import { MaterialPreviewModal } from "@/components/courses";
 import { useNote } from "@/hooks/queries/useNote";
 import { useMaterials } from "@/hooks/queries/useMaterials";
@@ -185,13 +185,14 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
     const [deleting, setDeleting] = useState(false);
     const [relatedCourse, setRelatedCourse] = useState<Course | null>(null);
     const [previewMaterial, setPreviewMaterial] = useState<CourseMaterial | null>(null);
+    const [createTaskOpen, setCreateTaskOpen] = useState(false);
 
     // Knowledge graph — fetch materials and tasks that share this note's course.
     // Hooks are called unconditionally (React rule); each hook's empty-string courseId
     // guard prevents spurious queries while the note is still loading.
     const courseId = note?.courseId ?? "";
     const { data: courseMaterials } = useMaterials(courseId);
-    const { data: allCourseTasks } = usePlannerByCourse(courseId);
+    const { data: allCourseTasks, createTask } = usePlannerByCourse(courseId);
     // Only surface incomplete tasks — completed tasks clutter the actionable list.
     const activeTasks = useMemo(() => allCourseTasks.filter((t) => !t.completed), [allCourseTasks]);
 
@@ -559,6 +560,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                                 icon={ListTodo}
                                 title="No active tasks"
                                 description="Active tasks for this course will appear here."
+                                action={{ label: "Create Task", onClick: () => setCreateTaskOpen(true) }}
                             />
                         )}
                     </SectionCard>
@@ -600,6 +602,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                                 icon={Layers}
                                 title="No related materials"
                                 description="Materials for this course will appear here."
+                                action={courseId ? { label: "Open Course", onClick: () => { window.location.hash = `#/dashboard/courses/${courseId}`; } } : undefined}
                             />
                         )}
                     </SectionCard>
@@ -655,6 +658,14 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                     )}
                 </motion.div>
             </div>
+
+            <CreateTaskModal
+                open={createTaskOpen}
+                onClose={() => setCreateTaskOpen(false)}
+                onCreate={createTask}
+                courses={relatedCourse ? [relatedCourse] : []}
+                defaultCourseId={courseId}
+            />
 
             <MaterialPreviewModal material={previewMaterial} onClose={() => setPreviewMaterial(null)} />
 

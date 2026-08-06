@@ -204,6 +204,7 @@ export function PlannerPage() {
                         label="Today's Tasks"
                         color="from-violet-500 to-indigo-500"
                         compactOnMobile
+                        onClick={() => setFilter("today")}
                     />
                     <StatCard
                         icon={CalendarDays}
@@ -211,6 +212,7 @@ export function PlannerPage() {
                         label="Due This Week"
                         color="from-blue-500 to-cyan-500"
                         compactOnMobile
+                        onClick={() => setFilter("upcoming")}
                     />
                     <StatCard
                         icon={CheckCircle2}
@@ -218,6 +220,7 @@ export function PlannerPage() {
                         label="Completed"
                         color="from-emerald-500 to-teal-500"
                         compactOnMobile
+                        onClick={() => setFilter("completed")}
                     />
                     <StatCard
                         icon={AlertCircle}
@@ -225,6 +228,7 @@ export function PlannerPage() {
                         label="Overdue"
                         color="from-rose-500 to-orange-500"
                         compactOnMobile
+                        onClick={() => setFilter("overdue")}
                     />
                 </motion.div>
 
@@ -257,7 +261,16 @@ export function PlannerPage() {
                     </motion.div>
                 ) : (
                     <div className="rounded-2xl border border-dashed border-zinc-800">
-                        <EmptyState icon={emptyState.icon} title={emptyState.title} description={emptyState.description} />
+                        <EmptyState
+                            icon={emptyState.icon}
+                            title={emptyState.title}
+                            description={emptyState.description}
+                            action={
+                                emptyState.title === "No tasks yet"
+                                    ? { label: "New Task", onClick: () => setCreateModalOpen(true) }
+                                    : undefined
+                            }
+                        />
                     </div>
                 )}
             </div>

@@ -1,4 +1,4 @@
-import { FileText, Layers, Paperclip } from "lucide-react";
+import { FileText, Layers } from "lucide-react";
 import { SectionCard, EmptyState, RelatedCourseCard } from "@/components/common";
 import type { Course } from "@/types/courses";
 import type { NoteRecord } from "@/services/note.service";
@@ -9,6 +9,8 @@ interface RelatedResourcesProps {
     relatedNotes: NoteRecord[];
     /** Full course list from useCourses() — used to resolve note.courseId → code. */
     courses: Course[];
+    /** Opens CreateNoteModal preset to the task's course. */
+    onCreateNote?: () => void;
 }
 
 function RelatedNoteRow({ note, courses }: { note: NoteRecord; courses: Course[] }) {
@@ -34,7 +36,7 @@ function RelatedNoteRow({ note, courses }: { note: NoteRecord; courses: Course[]
     );
 }
 
-export function RelatedResources({ course, relatedNotes, courses }: RelatedResourcesProps) {
+export function RelatedResources({ course, relatedNotes, courses, onCreateNote }: RelatedResourcesProps) {
     return (
         <div className="space-y-6">
             <div>
@@ -66,16 +68,9 @@ export function RelatedResources({ course, relatedNotes, courses }: RelatedResou
                         icon={FileText}
                         title="No related notes"
                         description="Notes from this course will show up here."
+                        action={onCreateNote ? { label: "Create Note", onClick: onCreateNote } : undefined}
                     />
                 )}
-            </SectionCard>
-
-            <SectionCard icon={Paperclip} title="Attachments">
-                <EmptyState
-                    icon={Paperclip}
-                    title="No attachments yet"
-                    description="File uploads aren't available yet — coming in a future sprint."
-                />
             </SectionCard>
         </div>
     );

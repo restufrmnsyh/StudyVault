@@ -2,8 +2,9 @@ import { useCallback } from "react";
 import { motion } from "framer-motion";
 import { GraduationCap, ChevronsLeft, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { sidebarItems, currentUser } from "@/data/dashboard";
+import { sidebarItems } from "@/data/dashboard";
 import { useAuth } from "@/auth/useAuth";
+import { useProfile } from "@/hooks/queries/useProfile";
 
 interface SidebarProps {
   currentPath: string;
@@ -13,7 +14,31 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarProps) {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const { data: profile } = useProfile();
+
+  // Derive display name — mirrors the same logic used in Hero.tsx
+  let displayName = "Student";
+  if (profile?.fullName) {
+    displayName = profile.fullName;
+  } else if (user?.email) {
+    displayName = user.email
+      .split("@")[0]
+      .replace(/[._]/g, " ")
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  // Derive two-letter initials from the first and last word of the display name
+  const initials = (() => {
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  })();
+
+  const role = profile?.major ?? "";
 
   const handleNavClick = useCallback(
     (href: string) => {
@@ -109,16 +134,18 @@ export function Sidebar({ currentPath, collapsed, onToggle, onClose }: SidebarPr
           )}
         >
           <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 text-[11px] font-bold text-white">
-            {currentUser.initials}
+            {initials}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-medium text-text-primary">
-                {currentUser.name}
+                {displayName}
               </p>
-              <p className="truncate text-[11px] text-text-muted">
-                {currentUser.role}
-              </p>
+              {role && (
+                <p className="truncate text-[11px] text-text-muted">
+                  {role}
+                </p>
+              )}
             </div>
           )}
           {!collapsed && (
