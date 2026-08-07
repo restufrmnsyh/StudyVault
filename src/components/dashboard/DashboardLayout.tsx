@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { MobileNav } from "./MobileNav";
+import { GlobalSearchModal } from "@/components/search";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -10,6 +11,7 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(
     window.location.hash.replace("#", "") || "/dashboard",
   );
@@ -23,9 +25,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  // Global keyboard shortcut for search (Cmd/Ctrl + K)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Cmd+K (macOS) or Ctrl+K (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const toggleSidebar = useCallback(() => setSidebarCollapsed((c) => !c), []);
   const toggleMobileMenu = useCallback(() => setMobileMenuOpen((o) => !o), []);
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-background">
@@ -58,7 +76,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onMenuToggle={toggleMobileMenu} />
+        <Topbar onMenuToggle={toggleMobileMenu} onSearchOpen={openSearch} />
 
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
           <div className="mx-auto w-full max-w-[1400px] p-4 lg:p-6 xl:p-8">
@@ -69,6 +87,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Mobile bottom nav */}
       <MobileNav currentPath={currentPath} />
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal open={searchOpen} onClose={closeSearch} />
     </div>
   );
 }

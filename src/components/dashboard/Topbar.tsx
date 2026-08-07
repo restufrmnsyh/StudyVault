@@ -4,9 +4,10 @@ import { useProfile } from "@/hooks/queries/useProfile";
 
 interface TopbarProps {
   onMenuToggle: () => void;
+  onSearchOpen: () => void;
 }
 
-export function Topbar({ onMenuToggle }: TopbarProps) {
+export function Topbar({ onMenuToggle, onSearchOpen }: TopbarProps) {
   const { signOut, user } = useAuth();
   const { data: profile } = useProfile();
 
@@ -55,17 +56,19 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
         </a>
 
         {/* Desktop search */}
-        <div className="group hidden items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[13px] text-text-muted ring-violet-500/15 transition-all duration-200 focus-within:border-violet-500/30 focus-within:bg-white/[0.04] focus-within:ring-4 md:flex">
-          <Search className="h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200 group-focus-within:text-violet-400" />
-          <input
-            type="text"
-            placeholder="Search notes, courses..."
-            className="w-44 bg-transparent text-text-secondary outline-none placeholder:text-text-muted lg:w-64 xl:w-72"
-          />
+        <button
+          onClick={onSearchOpen}
+          className="group hidden items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-[13px] text-text-muted ring-violet-500/15 transition-all duration-200 hover:border-violet-500/30 hover:bg-white/[0.04] focus-visible:border-violet-500/30 focus-visible:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-4 md:flex"
+          aria-label="Open search"
+        >
+          <Search className="h-3.5 w-3.5 flex-shrink-0 transition-colors duration-200 group-hover:text-violet-400" />
+          <span className="w-44 text-left text-text-secondary lg:w-64 xl:w-72">
+            Search notes, courses...
+          </span>
           <kbd className="rounded border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-text-muted">
             ⌘K
           </kbd>
-        </div>
+        </button>
       </div>
 
       {/* Right: actions */}
@@ -82,6 +85,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
         {/* Mobile search */}
         <button
+          onClick={onSearchOpen}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary md:hidden"
           aria-label="Search"
         >
