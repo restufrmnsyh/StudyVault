@@ -1,4 +1,4 @@
-import { Search, Bell, Menu, GraduationCap, ArrowLeftToLine } from "lucide-react";
+import { Search, Menu, GraduationCap, ArrowLeftToLine } from "lucide-react";
 import { useAuth } from "@/auth/useAuth";
 import { useProfile } from "@/hooks/queries/useProfile";
 
@@ -92,18 +92,12 @@ export function Topbar({ onMenuToggle, onSearchOpen }: TopbarProps) {
           <Search className="h-4 w-4" />
         </button>
 
-        {/* Notifications */}
+        {/* Avatar — navigates to Settings */}
         <button
-          className="relative flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-white/[0.04] hover:text-text-primary"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-        </button>
-
-        {/* Avatar */}
-        <button
+          onClick={() => { window.location.hash = "#/dashboard/settings"; }}
           className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 text-[11px] font-bold text-white transition-shadow hover:shadow-md hover:shadow-violet-500/20"
-          aria-label={`${displayName} account menu`}
+          aria-label={`${displayName} settings`}
+          title="Settings"
         >
           {initials}
         </button>

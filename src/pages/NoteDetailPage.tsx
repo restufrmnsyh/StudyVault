@@ -6,7 +6,6 @@ import {
     ArrowLeft,
     CalendarDays,
     Clock,
-    Copy,
     FileText,
     Layers,
     ListTodo,
@@ -152,22 +151,6 @@ function MoreActionsMenu({ note, onToggleArchive }: { note: NoteRecord; onToggle
                         {note.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
                         {note.archived ? "Unarchive note" : "Archive note"}
                     </button>
-                    <div className="my-1 border-t border-zinc-800" />
-                    {[
-                        { icon: Copy, label: "Duplicate note" },
-                        { icon: Layers, label: "Move to course" },
-                        { icon: FileText, label: "Export as PDF" },
-                    ].map((item) => (
-                        <button
-                            key={item.label}
-                            type="button"
-                            onClick={() => setOpen(false)}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-text-secondary transition-colors hover:bg-white/[0.04] hover:text-text-primary"
-                        >
-                            <item.icon className="h-3.5 w-3.5" />
-                            {item.label}
-                        </button>
-                    ))}
                 </div>
             )}
         </div>
@@ -181,6 +164,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
     const [mode, setMode] = useState<NoteDetailMode>("view");
     const [form, setForm] = useState<EditForm | null>(null);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+    const [showEditWarning, setShowEditWarning] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [relatedCourse, setRelatedCourse] = useState<Course | null>(null);
@@ -268,6 +252,20 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
             form.tagsText.trim() !== note.tags.join(", ") ||
             form.contentText.trim() !== noteContentToPlainText(note.content).trim());
 
+    // Check if note has rich formatting that would be lost
+    const hasRichFormatting = note.content.some(
+        (block) => block.kind !== "paragraph"
+    );
+
+    function requestEdit() {
+        // Warn user if note has rich formatting
+        if (hasRichFormatting) {
+            setShowEditWarning(true);
+        } else {
+            startEdit();
+        }
+    }
+
     function startEdit() {
         setForm({
             title: note!.title,
@@ -275,6 +273,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
             contentText: noteContentToPlainText(note!.content),
         });
         setMode("edit");
+        setShowEditWarning(false);
     }
 
     function exitEditMode() {
@@ -648,7 +647,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                             </button>
                             <button
                                 type="button"
-                                onClick={startEdit}
+                                onClick={requestEdit}
                                 className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
                             >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -668,6 +667,18 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
             />
 
             <MaterialPreviewModal material={previewMaterial} onClose={() => setPreviewMaterial(null)} />
+
+            <ConfirmDialog
+                open={showEditWarning}
+                icon={AlertTriangle}
+                title="Edit will convert formatting to plain text"
+                description="This note contains headings, lists, code blocks, or quotes. Editing will convert all content to plain paragraphs. This cannot be undone once you save."
+                confirmLabel="Edit Anyway"
+                cancelLabel="Cancel"
+                destructive
+                onConfirm={startEdit}
+                onCancel={() => setShowEditWarning(false)}
+            />
 
             <ConfirmDialog
                 open={showDiscardConfirm}
