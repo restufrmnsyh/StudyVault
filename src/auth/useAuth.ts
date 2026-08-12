@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { AuthContext, type AuthContextValue } from "@/auth/AuthProvider";
+import { AuthContext, type AuthContextValue } from "@/auth/AuthContext";
 
 /** Access the current session and auth actions. Must be called under <AuthProvider>
  *  (mounted once, at the App root) — throwing on misuse surfaces a missing provider

@@ -34,7 +34,8 @@ export interface UsePlannerByCourseResult {
  */
 export function usePlannerByCourse(courseId: string): UsePlannerByCourseResult {
     const [data, setData] = useState<PlannerTaskRecord[]>([]);
-    const [loading, setLoading] = useState(true);
+    // Start in loading state only if we actually have a courseId to query.
+    const [loading, setLoading] = useState(Boolean(courseId));
     const [error, setError] = useState<string | null>(null);
 
     // Mirrors `data` into a ref so toggleComplete can read the current task state
@@ -46,6 +47,7 @@ export function usePlannerByCourse(courseId: string): UsePlannerByCourseResult {
     });
 
     const refresh = useCallback(async () => {
+        if (!courseId) return;
         setLoading(true);
         setError(null);
         try {
@@ -60,6 +62,10 @@ export function usePlannerByCourse(courseId: string): UsePlannerByCourseResult {
     // Initial load — separate promise chain so the effect cleanup flag works correctly.
     // See hooks/queries/useCourses.ts for the rationale behind this pattern.
     useEffect(() => {
+        // Do not query Supabase when courseId is missing — an empty filter would
+        // produce `course_id=eq.` which Supabase rejects with HTTP 400.
+        if (!courseId) return;
+
         let active = true;
 
         getPlannerTasksByCourse(courseId)

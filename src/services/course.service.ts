@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { Course } from "@/types/courses";
+import { courseAccentColors } from "@/constants/courses";
 
 /** Raw shape of a `courses` row (migration.sql section 2.2). */
 interface CourseRow {
@@ -72,7 +73,9 @@ export function toCourse(record: CourseRecord): Course {
         lecturer: record.lecturer ?? "",
         semester: record.semester != null ? `Semester ${record.semester}` : "Semester —",
         description: record.description ?? "",
-        color: record.color ?? DEFAULT_COURSE_COLOR,
+        color: (record.color && courseAccentColors.includes(record.color))
+            ? record.color
+            : DEFAULT_COURSE_COLOR,
         notesCount: 0,
         materialsCount: 0,
         assignmentsCount: 0,
