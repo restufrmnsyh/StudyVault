@@ -31,12 +31,18 @@ const cardVariant = {
 };
 
 /**
- * Entry points only. "Create Course" is wired to open CreateCourseModal (Sprint 4.4);
- * the other three stay intentionally non-interactive (no href, no onClick) — including
- * "Open Planner" even though that route already exists — since this sprint's scope is
- * just the one feature, not wiring every quick action.
+ * Entry points for common create/navigate actions. All actions are driven by
+ * props — the parent (DashboardPage) owns navigation and modal state.
  */
-export function QuickActions({ onCreateCourse, onCreateNote }: { onCreateCourse: () => void; onCreateNote?: () => void }) {
+export function QuickActions({
+    onCreateCourse,
+    onCreateNote,
+    onUploadMaterial,
+}: {
+    onCreateCourse: () => void;
+    onCreateNote?: () => void;
+    onUploadMaterial?: () => void;
+}) {
     return (
         <motion.div
             className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
@@ -56,7 +62,7 @@ export function QuickActions({ onCreateCourse, onCreateNote }: { onCreateCourse:
                             : action.label === "Open Planner"
                             ? () => { window.location.hash = "#/dashboard/planner"; }
                             : action.label === "Upload Material"
-                            ? () => { window.location.hash = "#/dashboard/courses"; }
+                            ? onUploadMaterial
                             : undefined
                     }
                     variants={cardVariant}

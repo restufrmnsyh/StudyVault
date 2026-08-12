@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type FormEvent, type DragEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { UploadCloud, X, FileText, FileArchive, FileImage, FileSpreadsheet, Presentation, FileType2 } from "lucide-react";
+import { Loader2, UploadCloud, X, FileText, FileArchive, FileImage, FileSpreadsheet, Presentation, FileType2 } from "lucide-react";
 import type { Course } from "@/types/courses";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
@@ -9,8 +9,25 @@ import { formatBytes, getMaterialType } from "@/services/material.service";
 interface UploadMaterialModalProps {
     open: boolean;
     onClose: () => void;
-    course: Course;
-    onUpload: (title: string, description: string, file: File) => Promise<unknown>;
+    /**
+     * Single-course mode — course is pre-selected and locked (e.g. CourseDetailPage).
+     * When provided, `courses` and `defaultCourseId` are ignored.
+     */
+    course?: Course;
+    /**
+     * Multi-course mode — user picks from this list inside the modal (e.g. DashboardPage).
+     * Required when `course` is not provided.
+     */
+    courses?: Course[];
+    /** Pre-select a course in multi-course mode. Falls back to courses[0] when omitted. */
+    defaultCourseId?: string;
+    /**
+     * Called with the resolved courseId as the 4th argument so callers that need to
+     * handle a dynamic course (Dashboard) can distinguish the target.
+     * Callers that already scope uploads to a fixed course (CourseDetailPage via
+     * useMaterials) may safely ignore the 4th param — TypeScript allows this.
+     */
+    onUpload: (title: string, description: string, file: File, courseId: string) => Promise<unknown>;
 }
 
 const ALLOWED_EXTENSIONS = ["pdf", "doc", "docx", "ppt", "pptx", "jpg", "jpeg", "png", "zip"];
@@ -37,38 +54,29 @@ const iconMap = {
     video: FileText, // fallback
 };
 
-export function UploadMaterialModal({ open, onClose, course, onUpload }: UploadMaterialModalProps) {
+export function UploadMaterialModal({
+    open,
+    onClose,
+    course,
+    courses,
+    defaultCourseId,
+    onUpload,
+}: UploadMaterialModalProps) {
     const { showToast } = useToast();
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [file, setFile] = useState<File | null>(null);
+
+    // selectedCourseId — fixed when `course` is given, editable when `courses` is given
+    const resolveDefaultCourseId = () =>
+        course?.id ?? defaultCourseId ?? courses?.[0]?.id ?? "";
+    const [selectedCourseId, setSelectedCourseId] = useState<string>(resolveDefaultCourseId);
     
     const [isDragOver, setIsDragOver] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [errors, setErrors] = useState<{ title?: string; file?: string }>({});
+    const [errors, setErrors] = useState<{ title?: string; file?: string; course?: string }>({});
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Simulate progress bar increment during upload
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval> | undefined;
-        if (submitting) {
-            const timer = setTimeout(() => {
-                setUploadProgress(10);
-                interval = setInterval(() => {
-                    setUploadProgress((prev) => {
-                        if (prev >= 90) return prev;
-                        return prev + 5;
-                    });
-                }, 100);
-            }, 0);
-            return () => {
-                clearTimeout(timer);
-                if (interval) clearInterval(interval);
-            };
-        }
-    }, [submitting]);
 
     // Reset fields when opening modal
     useEffect(() => {
@@ -78,10 +86,11 @@ export function UploadMaterialModal({ open, onClose, course, onUpload }: UploadM
                 setDescription("");
                 setFile(null);
                 setErrors({});
-                setUploadProgress(0);
+                setSelectedCourseId(resolveDefaultCourseId());
             }, 0);
             return () => clearTimeout(timer);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
     function handleClose() {
@@ -147,7 +156,10 @@ export function UploadMaterialModal({ open, onClose, course, onUpload }: UploadM
         e.preventDefault();
         if (submitting) return;
 
-        const validationErrors: { title?: string; file?: string } = {};
+        const validationErrors: { title?: string; file?: string; course?: string } = {};
+        if (!selectedCourseId) {
+            validationErrors.course = "Please select a course.";
+        }
         if (title.trim() === "") {
             validationErrors.title = "Material title is required.";
         }
@@ -160,13 +172,9 @@ export function UploadMaterialModal({ open, onClose, course, onUpload }: UploadM
 
         setSubmitting(true);
         try {
-            await onUpload(title, description, file!);
-            setUploadProgress(100);
+            await onUpload(title, description, file!, selectedCourseId);
             showToast("Material uploaded successfully.", "success");
-            // Delay closing slightly so the user sees 100% completion
-            setTimeout(() => {
-                onClose();
-            }, 300);
+            onClose();
         } catch (err) {
             showToast(err instanceof Error ? err.message : "Failed to upload material.", "error");
         } finally {
@@ -221,17 +229,55 @@ export function UploadMaterialModal({ open, onClose, course, onUpload }: UploadM
 
                         {/* Form */}
                         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                            {/* Course Display */}
+                            {/* Course — locked (single-course mode) or picker (multi-course mode) */}
                             <div>
-                                <label className="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5">
+                                <label
+                                    htmlFor="upload-course"
+                                    className="block text-[11px] font-semibold uppercase tracking-wider text-text-muted mb-1.5"
+                                >
                                     Course
                                 </label>
-                                <input
-                                    type="text"
-                                    value={`${course.code} — ${course.name}`}
-                                    disabled
-                                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-[13px] text-text-muted cursor-not-allowed opacity-80"
-                                />
+                                {course ? (
+                                    /* Single-course mode: readonly display */
+                                    <input
+                                        id="upload-course"
+                                        type="text"
+                                        value={`${course.code} — ${course.name}`}
+                                        disabled
+                                        className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-[13px] text-text-muted cursor-not-allowed opacity-80"
+                                    />
+                                ) : (
+                                    /* Multi-course mode: dropdown selector */
+                                    <select
+                                        id="upload-course"
+                                        value={selectedCourseId}
+                                        onChange={(e) => {
+                                            setSelectedCourseId(e.target.value);
+                                            setErrors((prev) => ({ ...prev, course: undefined }));
+                                        }}
+                                        disabled={submitting || !courses?.length}
+                                        className={cn(
+                                            "w-full rounded-lg border bg-zinc-950 px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:ring-1 disabled:cursor-not-allowed disabled:opacity-60",
+                                            errors.course
+                                                ? "border-rose-500/50 focus:border-rose-500/50 focus:ring-rose-500/25"
+                                                : "border-zinc-800 focus:border-violet-500/50 focus:ring-violet-500/25",
+                                        )}
+                                    >
+                                        {!selectedCourseId && (
+                                            <option value="" disabled className="bg-zinc-900 text-zinc-500">
+                                                Select a course
+                                            </option>
+                                        )}
+                                        {courses?.map((c) => (
+                                            <option key={c.id} value={c.id} className="bg-zinc-900 text-white">
+                                                {c.code} — {c.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                                {errors.course && (
+                                    <p className="mt-1.5 text-[12px] text-rose-400 font-medium">{errors.course}</p>
+                                )}
                             </div>
 
                             {/* Dropzone area */}
@@ -336,21 +382,13 @@ export function UploadMaterialModal({ open, onClose, course, onUpload }: UploadM
                                 />
                             </div>
 
-                            {/* Upload Progress Indicator */}
+                            {/* Upload progress — indeterminate spinner (Supabase Storage
+                                does not expose byte-level progress, so a fake % would be
+                                misleading; an honest spinner is used instead). */}
                             {submitting && (
-                                <div className="space-y-1.5 pt-2">
-                                    <div className="flex items-center justify-between text-[11.5px] text-text-muted">
-                                        <span>Uploading material...</span>
-                                        <span className="font-semibold tabular-nums text-text-secondary">{uploadProgress}%</span>
-                                    </div>
-                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                                        <motion.div
-                                            className="h-full bg-violet-500"
-                                            initial={{ width: "0%" }}
-                                            animate={{ width: `${uploadProgress}%` }}
-                                            transition={{ duration: 0.1 }}
-                                        />
-                                    </div>
+                                <div className="flex items-center gap-2 rounded-lg border border-violet-500/20 bg-violet-500/[0.06] px-3 py-2.5 text-[12px] text-violet-300">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+                                    <span>Uploading material — please wait…</span>
                                 </div>
                             )}
 
@@ -367,9 +405,16 @@ export function UploadMaterialModal({ open, onClose, course, onUpload }: UploadM
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="flex items-center justify-center rounded-lg bg-violet-500 px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-violet-600 disabled:bg-violet-500/50 disabled:cursor-not-allowed"
+                                    className="flex items-center justify-center gap-1.5 rounded-lg bg-violet-500 px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-violet-600 disabled:bg-violet-500/50 disabled:cursor-not-allowed"
                                 >
-                                    Upload
+                                    {submitting ? (
+                                        <>
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            Uploading…
+                                        </>
+                                    ) : (
+                                        "Upload"
+                                    )}
                                 </button>
                             </div>
                         </form>

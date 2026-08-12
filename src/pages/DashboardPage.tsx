@@ -10,7 +10,7 @@ import {
   RecentNotes,
   OverviewCards,
 } from "@/components/dashboard";
-import { CreateCourseModal } from "@/components/courses";
+import { CreateCourseModal, UploadMaterialModal } from "@/components/courses";
 import { CreateNoteModal } from "@/components/notes";
 import { CreateTaskModal } from "@/components/planner";
 import { useCourses } from "@/hooks/queries/useCourses";
@@ -18,6 +18,7 @@ import { useNotes } from "@/hooks/queries/useNotes";
 import { useProfile } from "@/hooks/queries/useProfile";
 import { usePlanner } from "@/hooks/queries/usePlanner";
 import { useAllMaterials } from "@/hooks/queries/useAllMaterials";
+import { uploadMaterialFile, createMaterial } from "@/services/material.service";
 
 export function DashboardPage() {
   // Owned here (not inside Hero) so Hero's stat count and CreateCourseModal's create
@@ -31,6 +32,7 @@ export function DashboardPage() {
   const [createCourseOpen, setCreateCourseOpen] = useState(false);
   const [createNoteOpen, setCreateNoteOpen] = useState(false);
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [uploadMaterialOpen, setUploadMaterialOpen] = useState(false);
 
   return (
     <DashboardLayout>
@@ -47,6 +49,7 @@ export function DashboardPage() {
         <QuickActions
           onCreateCourse={() => setCreateCourseOpen(true)}
           onCreateNote={() => setCreateNoteOpen(true)}
+          onUploadMaterial={() => setUploadMaterialOpen(true)}
         />
         <TodaysFocus tasks={tasks} loading={tasksLoading} courses={courses} />
         <ContinueLearning
@@ -92,6 +95,28 @@ export function DashboardPage() {
         onClose={() => setCreateTaskOpen(false)}
         onCreate={createTask}
         courses={courses}
+      />
+
+      {/* Upload Material — multi-course mode: user picks the target course from the
+          dropdown inside the modal. The onUpload handler calls the same two service
+          functions that useMaterials.uploadMaterial uses internally; there is no hook
+          that accepts a dynamic courseId, so this is the canonical approach. */}
+      <UploadMaterialModal
+        open={uploadMaterialOpen}
+        onClose={() => setUploadMaterialOpen(false)}
+        courses={courses}
+        onUpload={async (title, description, file, courseId) => {
+          const fileUrl = await uploadMaterialFile(courseId, file);
+          return createMaterial({
+            courseId,
+            title,
+            description,
+            fileName: file.name,
+            fileUrl,
+            mimeType: file.type || "application/octet-stream",
+            fileSize: file.size,
+          });
+        }}
       />
     </DashboardLayout>
   );

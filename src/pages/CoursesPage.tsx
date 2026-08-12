@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, BookOpen, Loader2 } from "lucide-react";
+import { AlertTriangle, BookOpen, Loader2, Plus } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
-import { CourseCard, CoursesToolbar } from "@/components/courses";
+import { CourseCard, CoursesToolbar, CreateCourseModal } from "@/components/courses";
+import { EmptyState } from "@/components/common";
 import { useCourses } from "@/hooks/queries/useCourses";
 
 const fadeInUp = {
@@ -22,9 +23,10 @@ const gridStagger = {
 };
 
 export function CoursesPage() {
-    const { data: courses, loading, error, refresh } = useCourses();
+    const { data: courses, loading, error, refresh, createCourse } = useCourses();
     const [search, setSearch] = useState("");
     const [semester, setSemester] = useState("All Semesters");
+    const [createCourseOpen, setCreateCourseOpen] = useState(false);
 
     const filteredCourses = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -72,13 +74,31 @@ export function CoursesPage() {
     return (
         <DashboardLayout>
             <div className="space-y-6 lg:space-y-8">
-                <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-                    <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
-                        Courses
-                    </h1>
-                    <p className="mt-1.5 text-[15px] text-text-muted">
-                        {courses.length} courses across your academic journey.
-                    </p>
+                {/* Header */}
+                <motion.div
+                    variants={fadeInUp}
+                    initial="hidden"
+                    animate="visible"
+                    className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                >
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-text-primary sm:text-3xl">
+                            Courses
+                        </h1>
+                        <p className="mt-1.5 text-[15px] text-text-muted">
+                            {courses.length} course{courses.length !== 1 ? "s" : ""} across your academic journey.
+                        </p>
+                    </div>
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setCreateCourseOpen(true)}
+                            className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
+                        >
+                            <Plus className="h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-90" />
+                            New Course
+                        </button>
+                    </div>
                 </motion.div>
 
                 <motion.div
@@ -95,7 +115,17 @@ export function CoursesPage() {
                     />
                 </motion.div>
 
-                {filteredCourses.length > 0 ? (
+                {/* Empty state: no courses exist at all */}
+                {courses.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-zinc-800">
+                        <EmptyState
+                            icon={BookOpen}
+                            title="No courses yet"
+                            description="Add your first course to get started."
+                            action={{ label: "Create Course", onClick: () => setCreateCourseOpen(true) }}
+                        />
+                    </div>
+                ) : filteredCourses.length > 0 ? (
                     <motion.div
                         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
                         variants={gridStagger}
@@ -107,6 +137,7 @@ export function CoursesPage() {
                         ))}
                     </motion.div>
                 ) : (
+                    /* No match for current search/filter */
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 py-16 text-center">
                         <BookOpen className="mb-3 h-8 w-8 text-text-muted" />
                         <p className="text-[14px] font-medium text-text-primary">No courses found</p>
@@ -116,6 +147,12 @@ export function CoursesPage() {
                     </div>
                 )}
             </div>
+
+            <CreateCourseModal
+                open={createCourseOpen}
+                onClose={() => setCreateCourseOpen(false)}
+                onCreate={createCourse}
+            />
         </DashboardLayout>
     );
 }

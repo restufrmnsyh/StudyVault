@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Pencil, X } from "lucide-react";
 import { CourseForm, type CourseFormErrors, type CourseFormValues } from "@/components/courses/CourseForm";
@@ -48,14 +48,26 @@ export function EditCourseModal({ open, course, onClose, onUpdate }: EditCourseM
     const [errors, setErrors] = useState<CourseFormErrors>({});
     const [submitting, setSubmitting] = useState(false);
 
-    // Re-fill the form from the current course whenever the modal opens. Guarded by
-    // `open` so a background update to `course` (there isn't one today, since onUpdate
-    // resolves after this modal has already closed) can't clobber an in-progress edit.
-    useEffect(() => {
-        if (!open) return;
-        setValues(courseToFormValues(course));
-        setErrors({});
-    }, [open, course]);
+    // Refill the form when the modal opens or when a different course is passed in
+    // while it is open. Using render-phase state comparison (React docs “adjusting
+    // state on prop change”) instead of useEffect to satisfy react-hooks/set-state-in-effect.
+    //
+    // Safe because:
+    //   • `open` is boolean — no undefined/null edge cases.
+    //   • `course.id` is a required string on the Course type — no edge cases.
+    //   • The condition becomes false on the very next render, so exactly one extra
+    //     render is triggered — no cascade.
+    const [prevOpen, setPrevOpen] = useState(open);
+    const [prevCourseId, setPrevCourseId] = useState(course.id);
+
+    if (open !== prevOpen || course.id !== prevCourseId) {
+        setPrevOpen(open);
+        setPrevCourseId(course.id);
+        if (open) {
+            setValues(courseToFormValues(course));
+            setErrors({});
+        }
+    }
 
     function handleClose() {
         if (submitting) return; // don't let the backdrop/X interrupt an in-flight request

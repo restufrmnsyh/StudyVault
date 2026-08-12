@@ -1,32 +1,16 @@
-import { createContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
-
-export interface AuthResult {
-    error: string | null;
-}
-
-export interface AuthContextValue {
-    /** Null while the initial session check is in flight — see `loading`. */
-    user: User | null;
-    session: Session | null;
-    /** True only until the first getSession()/onAuthStateChange() resolves. Guards
-     *  (ProtectedRoute/GuestOnlyRoute) use this to avoid redirecting on a still-unknown
-     *  session, which would otherwise bounce a logged-in user to /login for a flash. */
-    loading: boolean;
-    signIn: (email: string, password: string) => Promise<AuthResult>;
-    signUp: (email: string, password: string) => Promise<AuthResult>;
-    resetPassword: (email: string) => Promise<AuthResult>;
-    signOut: () => Promise<void>;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext, type AuthContextValue } from "./AuthContext";
+import type { Session } from "@supabase/supabase-js";
 
 /**
  * Owns the Supabase session and exposes it (plus the four auth actions the spec calls
  * for) through context. No token handling here — `supabase-js` persists the session to
  * storage and refreshes it internally; this provider only ever reads what it hands back
  * via getSession() / onAuthStateChange(), never touches a token directly.
+ *
+ * AuthContext and its type definitions live in ./AuthContext.ts so this file exports
+ * only the AuthProvider component, satisfying react-refresh/only-export-components.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
