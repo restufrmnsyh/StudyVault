@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard";
 import { SectionCard, EmptyState, ConfirmDialog, RelatedCourseCard, ListRow } from "@/components/common";
-import { NoteContentBlocks } from "@/components/notes";
+import { NoteContentBlocks, NoteBlockEditor } from "@/components/notes";
 import { TaskCard, CreateTaskModal } from "@/components/planner";
 import { MaterialPreviewModal } from "@/components/courses";
 import { useNote } from "@/hooks/queries/useNote";
@@ -45,7 +45,9 @@ type NoteDetailMode = "view" | "edit";
 interface EditForm {
     title: string;
     tagsText: string;
-    contentText: string;
+    /** The live block state edited in NoteBlockEditor. Initialised directly from
+     *  note.content so no lossy conversion ever touches the structured blocks. */
+    blocks: NoteContentBlock[];
 }
 
 const fadeInUp = {
@@ -64,33 +66,27 @@ const fieldClassName =
  *  If more exist, a "View All" link navigates to the full Course Detail page. */
 const PREVIEW_LIMIT = 5;
 
-function noteContentToPlainText(blocks: NoteContentBlock[]): string {
-    return blocks
-        .map((block) => {
-            switch (block.kind) {
-                case "heading":
-                case "paragraph":
-                case "quote":
-                    return block.text;
-                case "bullet-list":
-                    return block.items.map((item) => `- ${item}`).join("\n");
-                case "numbered-list":
-                    return block.items.map((item, i) => `${i + 1}. ${item}`).join("\n");
-                case "code":
-                    return block.code;
-                default:
-                    return "";
+/** Extracts a short preview string from content blocks for the note.preview field. */
+function noteBlocksToPreview(blocks: NoteContentBlock[]): string {
+    for (const block of blocks) {
+        switch (block.kind) {
+            case "heading":
+            case "paragraph":
+            case "quote":
+                if (block.text.trim()) return block.text.trim();
+                break;
+            case "bullet-list":
+            case "numbered-list": {
+                const joined = block.items.filter(Boolean).join(" · ");
+                if (joined) return joined;
+                break;
             }
-        })
-        .join("\n\n");
-}
-
-function plainTextToNoteContent(text: string): NoteContentBlock[] {
-    return text
-        .split(/\n\s*\n/)
-        .map((paragraph) => paragraph.trim())
-        .filter(Boolean)
-        .map((paragraph) => ({ kind: "paragraph", text: paragraph.replace(/\s*\n\s*/g, " ") }));
+            case "code":
+                if (block.code.trim()) return block.code.trim();
+                break;
+        }
+    }
+    return "";
 }
 
 function formatRelativeTime(dateString: string): string {
@@ -164,7 +160,6 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
     const [mode, setMode] = useState<NoteDetailMode>("view");
     const [form, setForm] = useState<EditForm | null>(null);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-    const [showEditWarning, setShowEditWarning] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [relatedCourse, setRelatedCourse] = useState<Course | null>(null);
@@ -250,30 +245,16 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
         form !== null &&
         (form.title.trim() !== note.title ||
             form.tagsText.trim() !== note.tags.join(", ") ||
-            form.contentText.trim() !== noteContentToPlainText(note.content).trim());
-
-    // Check if note has rich formatting that would be lost
-    const hasRichFormatting = note.content.some(
-        (block) => block.kind !== "paragraph"
-    );
-
-    function requestEdit() {
-        // Warn user if note has rich formatting
-        if (hasRichFormatting) {
-            setShowEditWarning(true);
-        } else {
-            startEdit();
-        }
-    }
+            JSON.stringify(form.blocks) !== JSON.stringify(note.content));
 
     function startEdit() {
+        // Pass note.content directly — no lossy conversion to plain text.
         setForm({
             title: note!.title,
             tagsText: note!.tags.join(", "),
-            contentText: noteContentToPlainText(note!.content),
+            blocks: note!.content,
         });
         setMode("edit");
-        setShowEditWarning(false);
     }
 
     function exitEditMode() {
@@ -297,8 +278,10 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                 .split(",")
                 .map((t) => t.trim())
                 .filter(Boolean);
-            const content = plainTextToNoteContent(form.contentText);
-            const preview = form.contentText.length > 150 ? form.contentText.slice(0, 150) + "..." : form.contentText;
+            // Blocks are already NoteContentBlock[] — pass through without conversion.
+            const content = form.blocks;
+            const previewText = noteBlocksToPreview(form.blocks);
+            const preview = previewText.length > 150 ? previewText.slice(0, 150) + "..." : previewText;
 
             await updateNote({
                 title: form.title.trim(),
@@ -495,22 +478,10 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                     <SectionCard icon={FileText} title={isEditing ? "Edit Content" : "Note Content"}>
                         <div className="p-5 sm:p-6">
                             {isEditing && form ? (
-                                <div>
-                                    <label htmlFor="note-content" className="sr-only">
-                                        Note content
-                                    </label>
-                                    <textarea
-                                        id="note-content"
-                                        value={form.contentText}
-                                        onChange={(e) => setForm({ ...form, contentText: e.target.value })}
-                                        placeholder="Write your note..."
-                                        rows={14}
-                                        className={cn(fieldClassName, "resize-y text-[14px] leading-relaxed")}
-                                    />
-                                    <p className="mt-2 text-[11.5px] text-text-muted">
-                                        Plain text only — leave a blank line between paragraphs.
-                                    </p>
-                                </div>
+                                <NoteBlockEditor
+                                    value={form.blocks}
+                                    onChange={(blocks) => setForm({ ...form, blocks })}
+                                />
                             ) : (
                                 <NoteContentBlocks blocks={note.content} />
                             )}
@@ -647,7 +618,7 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
                             </button>
                             <button
                                 type="button"
-                                onClick={requestEdit}
+                                onClick={startEdit}
                                 className="group flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-500 to-indigo-500 px-5 py-2.5 text-[13px] font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-violet-500/20"
                             >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -667,18 +638,6 @@ export function NoteDetailPage({ noteId }: NoteDetailPageProps) {
             />
 
             <MaterialPreviewModal material={previewMaterial} onClose={() => setPreviewMaterial(null)} />
-
-            <ConfirmDialog
-                open={showEditWarning}
-                icon={AlertTriangle}
-                title="Edit will convert formatting to plain text"
-                description="This note contains headings, lists, code blocks, or quotes. Editing will convert all content to plain paragraphs. This cannot be undone once you save."
-                confirmLabel="Edit Anyway"
-                cancelLabel="Cancel"
-                destructive
-                onConfirm={startEdit}
-                onCancel={() => setShowEditWarning(false)}
-            />
 
             <ConfirmDialog
                 open={showDiscardConfirm}
